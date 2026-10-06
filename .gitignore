@@ -1,0 +1,58 @@
+# --- Personal documents (CV, job offer) ---
+ressource/
+
+# --- Data: never versioned (CC BY-NC 4.0, size). Keep the folder skeleton only ---
+data/**
+!data/**/
+!data/**/.gitkeep
+
+# --- Medical images and model weights, wherever they land ---
+*.nii
+*.nii.gz
+*.mgz
+*.mgh
+*.dcm
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.7z
+*.zip
+
+# --- nnU-Net working directories ---
+nnUNet_raw/
+nnUNet_preprocessed/
+nnUNet_results/
+
+# --- Results: keep only the deliverables shown in the README ---
+results/*
+!results/figures/
+!results/tables/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# --- Tools ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.snakemake/
+.ipynb_checkpoints/
+emissions.csv
+*.log
+
+# --- OS / IDE ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

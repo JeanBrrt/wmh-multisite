@@ -1,0 +1,238 @@
+# wmh-multisite — central configuration.
+# Every path is relative to the repository root. Values marked TBD are decided
+# later and logged in justification.md.
+
+seed: 42
+
+paths:
+  raw: data/raw                  # files as downloaded from DataverseNL (orig/, pre/, wmh.nii.gz)
+  bids: data/bids                # BIDS-organized copy of the raw images
+  derivatives: data/derivatives  # everything computed by the pipeline
+  results: results               # tables and figures shown in the README
+  nnunet: data/nnunet            # nnU-Net raw datasets and archives for Kaggle
+  templateflow: data/templateflow  # TEMPLATEFLOW_HOME: atlas files downloaded by TemplateFlow
+
+dataset:
+  name: MICCAI WMH Segmentation Challenge 2017
+  doi: 10.34894/AECRSD
+  license: CC BY-NC 4.0
+  api_url: https://dataverse.nl/api/datasets/:persistentId/?persistentId=doi:10.34894/AECRSD
+  file_url: https://dataverse.nl/api/access/datafile/{file_id}
+  # Files kept per subject, relative to the subject folder (J-015: pre/3DT1 is skipped).
+  keep:
+    - orig/FLAIR.nii.gz
+    - orig/3DT1.nii.gz
+    - orig/3DT1_mask.nii.gz       # defacing mask of the 3D T1 (T1 grid), all sites
+    - orig/FLAIR_mask.nii.gz      # defacing mask of the FLAIR (FLAIR grid), Amsterdam only (J-028)
+    - orig/T1.nii.gz             # T1 aligned to FLAIR by the organizers (elastix): registration QC reference
+    - orig/reg_3DT1_to_FLAIR.txt
+    - pre/FLAIR.nii.gz           # organizers' preprocessing: reference and "preprocessing effect" experiment
+    - pre/T1.nii.gz
+    - wmh.nii.gz                 # manual reference standard, FLAIR space
+  additional_observers: [observer_o3, observer_o4]   # 60 training cases each
+  extra_files: [readme.pdf]      # top-level documentation of the challenge
+  download:
+    workers: 4                   # parallel downloads (network-bound, light on RAM)
+    retries: 3                   # attempts per file before giving up
+    checksum: SHA-1              # algorithm published by DataverseNL for every file
+
+# Five scanners. `folder` is the path inside the dataset, below training/ or test/.
+# `seen_in_training` is false for the two scanners that only appear in the test set.
+# `protocol` is copied from the challenge readme (acquisition, not the published files): the 3D
+# FLAIRs of Amsterdam were reoriented to transversal and resampled to 3 mm slices by the
+# organizers. Actual voxel sizes are read from the NIfTI headers during the BIDS conversion.
+scanners:
+  utrecht_philips_3t:
+    folder: Utrecht
+    institute: UMC Utrecht
+    vendor: Philips
+    model: Achieva
+    field_strength_t: 3.0
+    protocol:            # acquisition protocol from the challenge readme (times in ms)
+      t1w: {acquisition: 3D, voxel_mm: [1.00, 1.00, 1.00], tr_ms: 7.9, te_ms: 4.5}
+      flair: {acquisition: 2D, voxel_mm: [0.96, 0.95, 3.00], tr_ms: 11000, te_ms: 125, ti_ms: 2800}
+    n_train: 20
+    n_test: 30
+    seen_in_training: true
+  singapore_siemens_3t:
+    folder: Singapore
+    institute: NUHS Singapore
+    vendor: Siemens
+    model: TrioTim
+    field_strength_t: 3.0
+    protocol:            # acquisition protocol from the challenge readme (times in ms)
+      t1w: {acquisition: 3D, voxel_mm: [1.00, 1.00, 1.00], tr_ms: 2300, te_ms: 1.9, ti_ms: 900}
+      flair: {acquisition: 2D, voxel_mm: [1.00, 1.00, 3.00], tr_ms: 9000, te_ms: 82, ti_ms: 2500}
+    n_train: 20
+    n_test: 30
+    seen_in_training: true
+  amsterdam_ge_3t:
+    folder: Amsterdam/GE3T
+    institute: VU Amsterdam
+    vendor: GE
+    model: Signa HDxt
+    field_strength_t: 3.0
+    protocol:            # acquisition protocol from the challenge readme (times in ms)
+      t1w: {acquisition: 3D, voxel_mm: [0.94, 0.94, 1.00], tr_ms: 7.8, te_ms: 3.0}
+      flair: {acquisition: 3D, voxel_mm: [0.98, 0.98, 1.20], tr_ms: 8000, te_ms: 126, ti_ms: 2340}
+    n_train: 20
+    n_test: 30
+    seen_in_training: true
+  amsterdam_ge_1p5t:
+    folder: Amsterdam/GE1T5
+    institute: VU Amsterdam
+    vendor: GE
+    model: Signa HDxt
+    field_strength_t: 1.5
+    protocol:            # acquisition protocol from the challenge readme (times in ms)
+      t1w: {acquisition: 3D, voxel_mm: [0.98, 0.98, 1.50], tr_ms: 12.3, te_ms: 5.2}
+      flair: {acquisition: 3D, voxel_mm: [1.21, 1.21, 1.30], tr_ms: 6500, te_ms: 117, ti_ms: 1987}
+    n_train: 0
+    n_test: 10
+    seen_in_training: false
+  amsterdam_philips_3t:
+    folder: "Amsterdam/Philips_VU .PETMR_01."   # folder name as published (space and dots included)
+    institute: VU Amsterdam
+    vendor: Philips
+    model: Ingenuity
+    field_strength_t: 3.0
+    protocol:            # acquisition protocol from the challenge readme (times in ms)
+      t1w: {acquisition: 3D, voxel_mm: [0.87, 0.87, 1.00], tr_ms: 9.9, te_ms: 4.6}
+      flair: {acquisition: 3D, voxel_mm: [1.04, 1.04, 0.56], tr_ms: 4800, te_ms: 279, ti_ms: 1650}
+    n_train: 0
+    n_test: 10
+    seen_in_training: false
+
+labels:
+  background: 0
+  wmh: 1
+  other_pathology: 2   # ignored by the official evaluation
+
+bids:
+  version: 1.10.0
+  subject_naming: "sub-{id:03d}"   # original challenge id, unique across sites (J-025)
+
+# Local safety rules (J-005).
+guard:
+  ram_limit_gb: 10
+  max_parallel_jobs: 2
+  poll_interval_s: 1.0
+  min_free_ram_gb: 4         # machine-wide floor: a new job starts only if this much RAM is available
+
+preproc:
+  n4:
+    mask: hdbet            # J-034, J-036: HD-BET brain mask (otsu = first variant, archived)
+  rigid:
+    type_of_transform: Rigid   # ANTsPy defaults validated against elastix (J-016)
+    qc_min_corr_vs_elastix: 0.95   # J-031: flag below (Kaggle test: 0.981-0.993)
+    qc_max_rotation_deg: 2.0       # J-031: flag if our rigid differs from elastix by more
+    qc_max_translation_mm: 2.0
+    seed: 42                       # random sampling of the metric: fixed for reproducibility
+    threads: 1                     # ITK multithreading is not deterministic (J-031): 1 thread per subject
+    use_elastix: [sub-146]         # J-039: organizers' elastix transform instead of ANTs (atypical FLAIR)
+  brainmask:
+    tool: hd-bet           # run locally on the GPU, in a separate uv environment (J-033)
+    input: T1w             # raw 3D T1 at 1 mm (finest anatomy); carried onto the FLAIR grid (J-033)
+    tta: true              # test-time augmentation (mirroring): recommended on GPU by the HD-BET authors
+    qc_brain_ml: [900, 2000]   # flag brain volumes outside this range (adult brain + ventricles)
+    runtime:               # temporary environment: the project's own PyTorch is CPU-only
+      packages: ["hd-bet==2.0.1", "torch==2.14.1+cu130"]
+      index_url: https://download.pytorch.org/whl/cu130
+      python: "3.12"
+    vram_cap_gb: 5.5       # PyTorch hard cap: clean OOM instead of a spill into Windows shared memory
+    guard_vram_gb: 6.0     # watchdog limits for one batch (measured on sub-000: 4.1 GB VRAM, 3.2 GB RAM)
+    guard_ram_gb: 10.0
+    batch_size: 20         # subjects per worker process (model loaded once per batch)
+  atlas:                   # step 3.6 (J-041)
+    type_of_transform: SyN         # rigid + affine + SyN (ANTs defaults: Mattes MI, flow_sigma 3)
+    template: MNI152NLin2009cAsym  # TemplateFlow, 1 mm
+    resolution: 1
+    ventricle_atlas: {atlas: HOSPA, desc: th25}   # Harvard-Oxford subcortical, 25 % threshold
+    ventricle_labels: [3, 14]      # left / right lateral ventricles (checked: 9 and 8 ml, x = -/+12.7 mm, darkest structures)
+    core_mm: 3                     # atlas ventricles eroded by this distance: certainly CSF (subject CSF intensity)
+    zone_mm: 10                    # refined ventricles searched within this distance of the atlas ventricles
+    tissue_min_mm: 10              # brain tissue sampled at least this far from the atlas ventricles
+    jobs: 4                        # subjects in parallel: 1 thread and ~2 GB RAM each (measured)
+    ram_limit_gb: 4                # per subject: 2x the measured peak (2.0 GB)
+    threads: 1                     # ITK multithreading is not deterministic (J-031)
+    seed: 42
+
+qc:                             # Phase 4 (J-051)
+  outlier_method: isolation_forest
+  classes: [usable, check, exclude]
+  min_per_scanner: 8            # fewer images on a scanner: no z-score (class not_assessed)
+  z_check: 3                    # robust z per scanner (positive = worse) from which an image is "check"
+  z_exclude: 5                  # ... and "exclude" (recommendation for visual control, never automatic)
+  iforest_contamination: 0.05   # expected share of atypical subjects for the Isolation Forest
+  wmh_margin_mm: 2              # 4.1: white matter within this distance of a WMH left out of the IQMs (J-059)
+  artifacts:                    # 4.3: simulated artifacts on clean images, increasing intensity (level 0 = none)
+    n_per_scanner: 2
+    levels:
+      noise: [0, 0.03, 0.06, 0.1, 0.15]        # noise std / brain median intensity
+      motion: [0, 1, 2, 4, 8]                  # max rotation (deg) and translation (mm)
+      bias: [0, 0.1, 0.2, 0.35, 0.5]           # bias field polynomial coefficients
+      ghosting: [0, 0.1, 0.3, 0.6, 1.0]        # ghost intensity
+  robustness:                   # 4.3 extension: nnU-Net on degraded FLAIRs (J-057)
+    n_per_scanner: 2            # usable test subjects per scanner
+
+segmentation:
+  nnunet:
+    dataset_id: 1
+    dataset_name: Dataset001_WMH
+    channels: {"0": FLAIR, "1": T1}
+    configuration: 3d_fullres   # J-019
+    trainer: nnUNetTrainerWMH_250   # J-037 (2nd training: nnUNetTrainerWMH_DA5_250)
+    planner: nnUNetPlannerResEncM
+    plans: nnUNetResEncUNetMPlans
+    models:                     # trained models (folder name = trainer__plans__configuration)
+      resencm: {trainer: nnUNetTrainerWMH_250}          # J-037, J-038
+      resencm_da5: {trainer: nnUNetTrainerWMH_DA5_250}  # 2nd training (strong augmentation)
+    inference:                  # local GPU, temporary CUDA env (J-040)
+      packages: ["nnunetv2==2.8.1", "torch==2.14.1+cu130"]
+      checkpoint: checkpoint_final.pth
+      use_mirroring: true
+      tile_step_size: 0.5
+      vram_cap_gb: 5.5
+      guard_vram_gb: 6.0
+      guard_ram_gb: 10.0
+      batch_size: 37
+      seconds_per_subject_max: 120
+    fold: 0
+    n_folds: 5                  # cross-validation splits stratified by scanner (J-032)
+  wmhsynthseg:
+    subjects_per_scanner: 10    # J-020
+    ram_limit_gb: 32
+    wmh_label: 77
+  threshold:                    # M3, step 5.5 (J-044)
+    tuned_on: train             # J-013: nothing is tuned on the test set
+    grid:                       # one global (t, e, m) maximising the mean training Dice
+      z_start: 1.0              # t: robust z-score of the FLAIR inside the brain (median, MAD; J-028 rule A)
+      z_stop: 4.0
+      z_step: 0.1
+      min_depth_mm: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]   # e (widened on 2026-10-06 for 8.4; 5.5 optimum 14): distance to the brain border (train: 5 % of lesion voxels < 16 mm)
+      min_size_mm3: [0, 10, 20, 40, 80, 160, 320]       # m (widened on 2026-10-06 for 8.4): smallest connected component kept (26-connectivity)
+    t_grid_by_normalization:      # 8.4: threshold grid [start, stop, step] on the scale of each normalisation (J-055)
+      none: [0.5, 3.5, 0.1]         # I / median of the training brains (lesion medians 0.75 to 2.4 on train)
+      whitestripe: [1.5, 9.0, 0.25] # (I - mean NAWM) / SD NAWM (lesion medians 3.8 to 6.1)
+      histmatch: [80, 140, 2]       # standard scale, brain p1 -> 0, p99 -> 100 (lesion medians 95 to 125)
+    jobs: 2
+
+evaluation:
+  bootstrap_samples: 2000
+  confidence_level: 0.95
+  seed: 42                      # bootstrap resampling (step 6.2, J-047)
+
+biomarkers:
+  periventricular_distance_mm: 10   # 7.2: WMH voxel within this distance of the lateral ventricles = periventricular (J-050)
+  ventricles: [ventriclessynthseg, ventricles]   # 7.2 ventricle masks, by priority: WMH-SynthSeg (J-045), then atlas C
+  mni:                          # 7.5 lesion frequency maps (J-054, J-056)
+    resolution: 2               # MNI152NLin2009cAsym res-02
+    registration_dir: _syn_benchmark          # SyN CC 2 mm transforms of the night run, under derivatives/wmh-multisite
+    variant: cc2mm_100-70-50-20
+    models: [resencm, wmhsynthseg, threshold] # test-set sources mapped besides O1
+  min_lesion_mm3: 10            # 7.3: lesions counted comparably across sites (~2 voxels on the coarsest grid, J-048)
+  models: [resencm, threshold, resencm_da5, wmhsynthseg]   # test-set predictions measured when present
+
+harmonization:
+  intensity_methods: [none, zscore, whitestripe, histogram_matching]
+  combat_fit_on: train
