@@ -1,0 +1,9 @@
+,n,dice,hd95_mm,avd_pct,lesion_recall,lesion_f1
+all,110.0,0.8033,6.4466,16.0758,0.7236,0.78
+scanner=amsterdam_ge_1p5t,10.0,0.8076,8.3449,6.8454,0.8068,0.8253
+scanner=amsterdam_ge_3t,30.0,0.7962,5.2823,15.7311,0.7647,0.819
+scanner=amsterdam_philips_3t,10.0,0.7764,9.672,17.3923,0.6793,0.7809
+scanner=singapore_siemens_3t,30.0,0.8343,4.4788,14.4303,0.7501,0.8015
+scanner=utrecht_philips_3t,30.0,0.7868,7.871,20.7038,0.6429,0.7041
+seen=False,20.0,0.792,9.0084,12.1189,0.743,0.8031
+seen=True,90.0,0.8058,5.8774,16.9551,0.7193,0.7749

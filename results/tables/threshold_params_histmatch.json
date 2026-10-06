@@ -1,0 +1,48 @@
+{
+ "normalization": "histmatch",
+ "norm_params": {
+  "standard": [
+   0.0,
+   23.942984112643764,
+   44.340409447745074,
+   56.44358115879648,
+   62.456701484229825,
+   66.05944916389184,
+   69.03660282116452,
+   71.97327612678788,
+   75.30523918481111,
+   80.08361719906335,
+   100.0
+  ]
+ },
+ "z_threshold": 92.0,
+ "min_depth_mm": 16.0,
+ "min_size_mm3": 320.0,
+ "train_dice_mean": 0.5258,
+ "train_dice_by_scanner": {
+  "amsterdam_ge_3t": 0.4593,
+  "singapore_siemens_3t": 0.6028,
+  "utrecht_philips_3t": 0.5153
+ },
+ "best_per_scanner_for_information_only": {
+  "amsterdam_ge_3t": {
+   "z_threshold": 104.0,
+   "min_depth_mm": 14.0,
+   "min_size_mm3": 40.0,
+   "dice": 0.5373
+  },
+  "singapore_siemens_3t": {
+   "z_threshold": 90.0,
+   "min_depth_mm": 16.0,
+   "min_size_mm3": 320.0,
+   "dice": 0.6104
+  },
+  "utrecht_philips_3t": {
+   "z_threshold": 88.0,
+   "min_depth_mm": 16.0,
+   "min_size_mm3": 320.0,
+   "dice": 0.5281
+  }
+ },
+ "n_train_subjects": 60
+}

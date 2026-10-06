@@ -1,0 +1,2 @@
+participant_id,syn_seconds,syn_corr_brain,csf_median,tissue_median,threshold,contrast_csf_tissue,vent_atlas_ml,vent_ml,dice_atlas_refined,vent_flair_median_rel,peak_ram_gb,scanner
+sub-000,166.7,0.5048,32.9,443.5,238.2,0.074,21.1,109.1,0.311,0.071,1.99,utrecht_philips_3t

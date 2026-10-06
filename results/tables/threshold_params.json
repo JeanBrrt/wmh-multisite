@@ -1,0 +1,32 @@
+{
+ "z_threshold": 2.2,
+ "min_depth_mm": 14.0,
+ "min_size_mm3": 40.0,
+ "train_dice_mean": 0.5854,
+ "train_dice_by_scanner": {
+  "amsterdam_ge_3t": 0.6146,
+  "singapore_siemens_3t": 0.5464,
+  "utrecht_philips_3t": 0.5952
+ },
+ "best_per_scanner_for_information_only": {
+  "amsterdam_ge_3t": {
+   "z_threshold": 2.4,
+   "min_depth_mm": 12.0,
+   "min_size_mm3": 20.0,
+   "dice": 0.6332
+  },
+  "singapore_siemens_3t": {
+   "z_threshold": 1.7,
+   "min_depth_mm": 16.0,
+   "min_size_mm3": 160.0,
+   "dice": 0.6165
+  },
+  "utrecht_philips_3t": {
+   "z_threshold": 2.6,
+   "min_depth_mm": 14.0,
+   "min_size_mm3": 40.0,
+   "dice": 0.6218
+  }
+ },
+ "n_train_subjects": 60
+}

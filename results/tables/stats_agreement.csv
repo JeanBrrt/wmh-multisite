@@ -1,0 +1,29 @@
+split,rater,reference,biomarker,n,n_excluded,scale,bias,loa_low,loa_high,mean_diff_raw,icc_a1,icc_ci_low,icc_ci_high,p_kruskal_site
+test,resencm,O1,wmh_ml,110,0,ratio,0.9827,0.6213,1.5543,-0.65545,0.9823,0.97531,0.98838,0.00022243
+test,resencm_da5,O1,wmh_ml,110,0,ratio,0.90055,0.54402,1.4908,-1.2384,0.97611,0.96637,0.98356,3.0885e-05
+test,threshold,O1,wmh_ml,110,0,ratio,1.1767,0.3343,4.1421,-2.1407,0.81407,0.74049,0.87218,0.00026735
+test,wmhsynthseg,O1,wmh_ml,110,0,ratio,2.4374,0.41056,14.47,7,0.37158,0.28087,0.46931,0.097168
+training,O3,O1,wmh_ml,60,0,ratio,0.96652,0.59626,1.5667,-0.5218,0.98073,0.9678,0.98928,0.00029655
+training,O4,O1,wmh_ml,60,0,ratio,0.91379,0.55365,1.5082,-1.7397,0.97722,0.9654,0.98605,0.00014838
+training,resencm,O1,wmh_ml,12,0,ratio,0.8716,0.64947,1.1697,-2.1299,0.99038,0.96924,0.99537,0.077483
+test,resencm,O1,wmh_periventricular_ml,110,0,ratio,0.99994,0.6396,1.5633,0.13153,0.98199,0.97367,0.98858,0.0016843
+test,resencm_da5,O1,wmh_periventricular_ml,110,0,ratio,0.91638,0.55616,1.5099,-0.39753,0.97585,0.96584,0.9842,8.0903e-05
+test,threshold,O1,wmh_periventricular_ml,110,0,ratio,1.2102,0.41633,3.5176,-0.30769,0.85178,0.79412,0.89674,0.00021206
+test,wmhsynthseg,O1,wmh_periventricular_ml,110,0,ratio,2.5342,0.45667,14.063,7.4225,0.34899,0.25836,0.43771,0.086225
+training,O3,O1,wmh_periventricular_ml,60,0,ratio,0.98349,0.59851,1.6161,-0.27076,0.98027,0.96884,0.98838,0.00038078
+training,O4,O1,wmh_periventricular_ml,60,0,ratio,0.93652,0.54633,1.6054,-1.1935,0.97527,0.96305,0.98477,0.0002265
+training,resencm,O1,wmh_periventricular_ml,12,0,ratio,0.90357,0.67404,1.2113,-1.1578,0.99152,0.97216,0.99552,0.077483
+test,resencm,O1,wmh_deep_ml,108,2,ratio,0.86763,0.36878,2.0413,-0.80144,0.96427,0.93355,0.98476,6.7217e-05
+test,resencm_da5,O1,wmh_deep_ml,107,3,ratio,0.83051,0.44245,1.5589,-0.86364,0.97518,0.96406,0.98273,7.138e-06
+test,threshold,O1,wmh_deep_ml,107,3,ratio,0.93214,0.054305,16,-1.8845,0.54285,0.38942,0.66355,0.0001692
+test,wmhsynthseg,O1,wmh_deep_ml,109,1,ratio,2.2316,0.14373,34.649,-0.43071,0.43636,0.29277,0.57767,0.21667
+training,O3,O1,wmh_deep_ml,59,1,ratio,0.85856,0.42551,1.7323,-0.25515,0.96883,0.9465,0.98554,0.0016767
+training,O4,O1,wmh_deep_ml,60,0,ratio,0.77891,0.38805,1.5635,-0.54621,0.96843,0.94765,0.98377,0.00037484
+training,resencm,O1,wmh_deep_ml,12,0,ratio,0.69863,0.34829,1.4013,-0.97211,0.97063,0.92686,0.99134,0.19881
+test,resencm,O1,n_lesions_ge10mm3,110,0,difference of ln(x + 1),-0.19307,-0.58056,0.19442,-7.4182,0.89042,0.8559,0.91711,3.1044e-05
+test,resencm_da5,O1,n_lesions_ge10mm3,110,0,difference of ln(x + 1),-0.23035,-0.66264,0.20194,-8.7091,0.85732,0.81455,0.8911,0.00027064
+test,threshold,O1,n_lesions_ge10mm3,110,0,difference of ln(x + 1),-0.59067,-1.6418,0.46044,-20.245,0.30461,0.20729,0.39168,0.072544
+test,wmhsynthseg,O1,n_lesions_ge10mm3,110,0,difference of ln(x + 1),-0.82682,-1.5751,-0.078515,-25.536,0.29979,0.23583,0.36052,0.58214
+training,O3,O1,n_lesions_ge10mm3,60,0,difference of ln(x + 1),-0.23997,-0.67822,0.19828,-9.2833,0.84737,0.77312,0.8976,0.00063727
+training,O4,O1,n_lesions_ge10mm3,60,0,difference of ln(x + 1),-0.22546,-0.62259,0.17168,-7.85,0.87723,0.81323,0.92067,0.20704
+training,resencm,O1,n_lesions_ge10mm3,12,0,difference of ln(x + 1),-0.2265,-0.53718,0.084186,-10.083,0.93826,0.84834,0.97186,0.08696
