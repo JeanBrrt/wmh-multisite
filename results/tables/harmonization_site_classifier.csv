@@ -1,0 +1,5 @@
+scale,combat,balanced_accuracy,sd_over_folds,chance
+none,False,0.896,0.05713,0.2
+none,True,0.292,0.05879,0.2
+zscore,False,0.732,0.07756,0.2
+zscore,True,0.276,0.03878,0.2
