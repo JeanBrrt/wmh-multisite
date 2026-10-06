@@ -82,7 +82,7 @@ orig/ (FLAIR + T1 3D brutes, 5 scanners)
 | 1.2 | `pyproject.toml` (dépendances de base + extras `qc`, `harmonize`, `seg`, `workflow`, `dev`, `local`) ; environnement **uv** (`uv sync --extra local`, `uv.lock` versionné, J-021) ; correctif neuroHarmonize (J-022) | 45 min | [x] |
 | 1.3 | `config/config.yaml` : chemins, liste des scanners/sites, split train/test, paramètres par étape | 30 min | [x] (valeurs TBD tracées ; `flair_acquisition` = protocole du readme) |
 | 1.4 | `utils/io.py` (load, load_data, load_labels, save_like, same_grid, describe) et `utils/guard.py` (watchdog RAM/VRAM, J-005) ; notebook d'exploration `notebooks/01_explore_nifti.ipynb` | 45 min | [x] (testés à la main sur Utrecht 0 ; tests pytest en 9.2) |
-| 1.5 | Dépôt GitHub, premier commit et push | 10 min | [ ] (reporté, à faire par l'utilisateur) |
+| 1.5 | Dépôt GitHub, premier commit et push | 10 min | [~] premier commit le 2026-10-06 (159 fichiers, aucune donnée ni document personnel ; `notes/` laissé à l'utilisateur) ; dépôt GitHub à créer par l'utilisateur |
 
 **Fini quand** : `pip install -e .` fonctionne et `import wmh_multisite` passe.
 
@@ -147,7 +147,7 @@ Entrée : `orig/` brut. Sortie : FLAIR + T1 dans l'espace FLAIR natif, masques, 
 | 6.1 | `evaluate/metrics.py` : intégration du script officiel du challenge (licence MIT, J-012) — Dice, HD95, AVD, rappel et F1 lésionnels, label 2 ignoré | 45 min | P0 | [x] ResEnc M sur 110 cas : Dice 0,803, HD95 6,1 mm, AVD 15,4 %, rappel 0,728, F1 0,783 ; 9e/58 au classement (J-042) ; à refaire pour DA5, WMH-SynthSeg, seuillage |
 | 6.2 | `evaluate/stats.py` : résultats par scanner, **connus vs inconnus**, IC bootstrap, tests appariés entre méthodes | 1 h | P0 | [x] 6 tests ; M1 0,803 [0,784-0,820], M3 0,595 [0,560-0,629] ; aucune dégradation démontrée hors domaine pour M1 (J-047) ; à relancer quand M2 et DA5 sont évalués |
 | 6.3 | Accord inter-observateurs (O3, O4 vs référence) sur le train = plafond humain | 30 min | P1 | [x] `evaluate/interobserver.py`, 3 tests ; Dice O3 0,770, O4 0,785 contre O1 ; M1 0,815 sur les 12 cas de validation appariés (J-046) |
-| 6.4 | `viz/figures.py` : mosaïque de cas par scanner, barres par scanner et par méthode, positionnement vs leaderboard | 1 h 15 | P0 | [ ] |
+| 6.4 | `viz/figures.py` : mosaïque de cas par scanner, barres par scanner et par méthode, positionnement vs leaderboard | 1 h 15 | P0 | [x] 4 figures de synthèse ; classement officiel (readme.pdf) : M1 9e/58, DA5 10e, M3 et M2 55e (J-060) |
 
 ---
 
@@ -170,8 +170,8 @@ Pas de données démographiques → le « signal biologique à conserver » est 
 | # | Tâche | Estim. | Prio | Statut |
 |---|---|---|---|---|
 | 8.1 | `harmonize/intensity.py` : aucune / z-score / WhiteStripe / appariement d'histogrammes **Rappeler J-028 avant d'implémenter.** | 1 h | P1 | [x] none / zscore / whitestripe / histmatch, dans le cerveau (J-028), 6 tests (J-055) |
-| 8.2 | Caractéristiques de la substance blanche d'apparence normale + classifieur de site (validation croisée) **Rappeler J-028 avant d'implémenter.** | 45 min | P1 | [ ] |
-| 8.3 | `harmonize/combat.py` : ComBat (neuroHarmonize), ajusté sur le train ; précision du classifieur de site avant/après, conservation de l'association avec la charge lésionnelle | 45 min | P1 | [ ] |
+| 8.2 | Caractéristiques de la substance blanche d'apparence normale + classifieur de site (validation croisée) **Rappeler J-028 avant d'implémenter.** | 45 min | P1 | [x] 20 caractéristiques SB saine (FLAIR, T1) ; site deviné à 90 % (brut), 73 % (z robuste) (J-059) |
+| 8.3 | `harmonize/combat.py` : ComBat (neuroHarmonize), ajusté sur le train ; précision du classifieur de site avant/après, conservation de l'association avec la charge lésionnelle | 45 min | P1 | [x] ComBat appris dans les plis : site deviné à 28 % (hasard 20 %), variance due au site 2 %, lien avec la charge lésionnelle conservé (J-059) |
 | 8.4 | Effet de la normalisation d'intensité sur le seuillage (M3), par site | 30 min | P2 | [x] sans normalisation le seuillage s'effondre (0,20, 0,00 sur 2 sites) ; zscore meilleur (0,595), Dice indépendant du site pour les 3 normalisations par image (J-055) |
 
 ---
@@ -180,9 +180,9 @@ Pas de données démographiques → le « signal biologique à conserver » est 
 
 | # | Tâche | Estim. | Prio | Statut |
 |---|---|---|---|---|
-| 9.1 | `workflow/Snakefile` + règles : chaîne locale de bout en bout (étapes Kaggle documentées comme étapes externes) | 1 h 30 | P1 | [ ] |
-| 9.2 | Tests pytest (fixtures synthétiques : sphères, bruit) | 1 h | P1 | [ ] |
-| 9.3 | GitHub Actions : ruff, pytest, construction + test rapide de l'image Docker (Docker absent en local, J-005) | 45 min | P1 | [ ] |
+| 9.1 | `workflow/Snakefile` + règles : chaîne locale de bout en bout (étapes Kaggle documentées comme étapes externes) | 1 h 30 | P1 | [x] Snakefile par étapes, règles externes Kaggle, `ancient()` ; état existant enregistré, `-n` : rien à faire (J-061) |
+| 9.2 | Tests pytest (fixtures synthétiques : sphères, bruit) | 1 h | P1 | [x] 155 tests sur données synthétiques, sans réseau (J-029) |
+| 9.3 | GitHub Actions : ruff, pytest, construction + test rapide de l'image Docker (Docker absent en local, J-005) | 45 min | P1 | [x] GitHub Actions : uv verrouillé, ruff, pytest + couverture ; Docker à ajouter avec 9.4 (J-061) |
 | 9.4 | `containers/Dockerfile`, `containers/apptainer.def`, `hpc/slurm_jeanzay.sh` (fourni **non testé**, indiqué comme tel) | 1 h | P1 | [ ] |
 | 9.5 | CodeCarbon : empreinte des étapes principales | 20 min | P2 | [ ] **non réalisé, par choix (2026-10-06)** : priorité donnée aux analyses ; à faire si le temps le permet (mesure de l'empreinte des étapes principales : prétraitement, inférence, QC) |
 

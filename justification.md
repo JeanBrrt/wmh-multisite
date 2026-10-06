@@ -711,6 +711,38 @@ Un seul triplet (t, e, m) pour tous les scanners, choisi par recherche sur grill
 | 4 | 0,699 | 0,442 | 0,637 | 0,591 (0,31) |
 **Lecture, croisée avec la détection de 4.3** (comparaison qualitative : 4.3 dégradait les FLAIR brutes de 10 autres sujets). Champ de biais : la segmentation ne décroche qu'aux niveaux 3-4 (0,68 puis 0,44), alors que le QC le détecte dès le niveau 2 (60 %) puis à 100 % : **détecté avant de nuire**. Bruit : dégradation progressive et modérée (0,70 au niveau 4), détection partielle (30 à 70 %). Images fantômes : la segmentation baisse au niveau 3-4, le QC ne détecte qu'au niveau 4 (60 %). **Mouvement : c'est le seul artefact qui nuit dès le plus faible niveau** (1° et 1 mm : Dice -0,05, rappel lésionnel 0,72 -> 0,53, les petites lésions floutées disparaissent), **et le QC ne le détecte pas** (4.3) : c'est le risque principal, et la limite à écrire dans le README ; un indicateur dédié au mouvement manque au QC.
 **Incident (2026-10-06).** Pendant le premier passage, le disque C: s'est rempli (0 Go libre) : 149 images dégradées écrites sur 160, aucune prédiction. Cause principale : `ants.registration` écrit chaque transformation dans le dossier temporaire du système et ne la supprime jamais (807 fichiers, 5,4 Go, des recalages de 3.2, 3.6 et 7.5). Actions : fichiers temporaires d'ANTs du projet supprimés (vérifiés par leurs dates, du 3 au 5 octobre), `uv cache prune` ; 11,6 Go libres. **Correction** : `preproc.register.remove_registration_files`, appelée après chaque recalage (3.2, 3.6, script SyN), supprime les fichiers d'ANTs du dossier temporaire après leur copie (test : seuls les fichiers du dossier temporaire sont supprimés). Dossier incomplet supprimé et étude relancée en entier.
+
+---
+
+## J-059 — Signature de site des caractéristiques d'image (8.2) et harmonisation ComBat (8.3)
+2026-10-06 · Actée
+
+**Rappel J-028** : règle A appliquée (statistiques dans la substance blanche saine à l'intérieur du masque HD-BET) ; règle B sans objet (aucune caractéristique de fond).
+**8.2.** `harmonize/features.py` : par sujet, 10 caractéristiques en FLAIR et 10 en T1 (N4, T1 sur la grille FLAIR) : centiles 5 à 95, écart interquartile, asymétrie, aplatissement de la substance blanche saine (labels 2/41 de WMH-SynthSeg, qui donne aux HSB leur propre label), médiane du cortex et contraste cortex - SB ; deux échelles : `none` (une constante par modalité, médiane des cerveaux d'entraînement) et `zscore` (par image). `harmonize/combat.py` : classifieur de site (standardisation + régression logistique multinomiale), validation croisée en 5 plis stratifiés par scanner, précision équilibrée (hasard : 0,20).
+**8.3.** ComBat (neuroHarmonize, Bayes empirique ; J-022) avec covariables biologiques ln(1 + volume HSB de O1) et ICV. **Appris sur les plis d'entraînement et appliqué au pli de test** : le classifieur n'est jamais évalué sur des données harmonisées avec ses propres sujets de test. Écart à la ROADMAP (« ajusté sur le train ») : les 2 scanners inconnus n'ont aucun sujet d'entraînement et ComBat ne peut pas harmoniser un site qu'il n'a jamais vu ; les plis de validation croisée contiennent tous les sites. Préservation de la biologie : corrélation de Spearman de chaque caractéristique avec la charge lésionnelle, et part de variance expliquée par le scanner (eta²), avant et après ComBat (ajusté sur tous les sujets). 4 tests sur données simulées (effet de site connu, signal biologique conservé, eta², caractéristiques).
+**Résultats (170 sujets, 5 scanners).**
+| Échelle | Site deviné (avant ComBat) | Après ComBat | Part de variance due au site (avant -> après) | Lien avec la charge lésionnelle, \|rho\| moyen (avant -> après) |
+|---|---|---|---|---|
+| none | **0,90** | 0,29 | 0,71 -> 0,02 | 0,24 -> 0,28 |
+| zscore | **0,73** | 0,28 | 0,21 -> 0,02 | 0,40 -> 0,44 |
+**Lecture.** Les intensités de la substance blanche saine portent une forte signature du scanner : 90 % des sujets sont attribués au bon scanner sans normalisation, et encore **73 % après la normalisation par image** (z robuste), qui ne retire qu'une partie de l'effet de site (eta² 0,71 -> 0,21) : forme de l'histogramme et contraste restent propres au site. ComBat ramène le classifieur près du hasard (0,28 pour 0,20) et la part de variance due au site à 2 %, **sans perdre la biologie** : le lien avec la charge lésionnelle se renforce légèrement (0,40 -> 0,44), le bruit de site masquant une partie du signal. Limite : la covariable de charge vient de O1 (manuel) ; dans une étude réelle, elle viendrait d'une segmentation automatique.
+
+---
+
+## J-060 — Figures de synthèse et position au classement du challenge (6.4)
+2026-10-06 · Actée
+
+**Classement.** Source : tableau du classement (57 équipes, état de décembre 2022) page 20 du `readme.pdf` officiel du jeu de données, extrait dans `results/tables/leaderboard_wmh2017.csv` (le site du challenge, wmh.isi.uu.nl, ne répondait plus le 2026-10-06). Formule officielle (page 23) dans `evaluate/leaderboard.py` : pour chaque métrique, meilleure équipe 0, pire 1, linéaire entre les deux ; moyenne des 5 rangs. **Contrôle** : appliquée aux 57 équipes seules, la formule retrouve les scores publiés à 0,005 près (valeurs sources arrondies à 2 décimales) ; tests sur l'exemple chiffré du readme. Chaque méthode est insérée **seule** parmi les 57 équipes (ajouter une équipe peut changer les bornes d'une métrique).
+**Positions (sur 58).** M1 nnU-Net **9e** (Dice 2e, HD95 6e, AVD 1er, rappel 22e, F1 2e : J-042 confirmé) ; M1 + DA5 10e ; M1 sur les images `pre/` 10e ; M3 seuillage 55e ; M2 WMH-SynthSeg 55e.
+**Figures** (`viz/figures.py`, chiffres agrégés seulement) : `dice_by_method_and_scanner.png` (IC bootstrap de 6.2), `seen_vs_unseen.png`, `leaderboard.png`, `human_ceiling.png` ; tableau `leaderboard_positions.csv`.
+
+---
+
+## J-061 — Workflow Snakemake (9.1) et intégration continue (9.3)
+2026-10-06 · Actée
+
+**9.1.** `workflow/Snakefile` **au niveau des étapes** : chaque règle appelle un module du paquet sur tous les sujets (les modules sautent le travail déjà fait), de `download` à `figures`, en passant par le QC, les biomarqueurs, les cartes MNI et l'harmonisation (24 tâches pour la cible `all`). Les deux étapes faites sur Kaggle (entraînements nnU-Net, WMH-SynthSeg) sont des **règles externes** : elles échouent avec les instructions (notebook à lancer) si leurs fichiers manquent, et sont ignorées s'ils sont présents. `ancient()` sur les entrées des étapes coûteuses ou externes : seule leur existence compte, pour qu'une réécriture de rapport ne déclenche jamais un nouvel entraînement Kaggle ni 8 h de recalage. Le projet ayant été calculé étape par étape, `snakemake --touch` a enregistré l'état existant : `snakemake -n` répond « Nothing to be done ». Alternative écartée : règles par sujet (170 x ~20 fichiers par étape) : DAG lourd, et les modules gèrent déjà le parallélisme et la reprise sous watchdog. Le linter de Snakemake recommande une directive `log:` et un environnement par règle : non fait (environnement unique verrouillé par uv).
+**9.3.** `.github/workflows/ci.yml` : à chaque push, environnement verrouillé (`uv sync --frozen --extra local`), `ruff check` et `ruff format --check`, linter Snakemake (indicatif), pytest avec couverture. Vérifié localement avant le premier passage : verrou à jour, 66 fichiers formatés, lint sans erreur, **155 tests** passent. La construction de l'image Docker sera ajoutée avec 9.4.
 ---
 
 ## Décisions en attente

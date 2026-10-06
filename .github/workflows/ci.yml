@@ -1,0 +1,34 @@
+# Continuous integration (ROADMAP step 9.3, J-061): lint and tests on every push and pull request.
+# No data is needed: the tests build tiny synthetic images (J-029). The environment is the locked one
+# (uv.lock), so the CI runs the same versions as the development machine.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install the locked environment
+        run: uv sync --frozen --extra local
+
+      - name: Lint (ruff)
+        run: |
+          uv run ruff check src tests scripts
+          uv run ruff format --check src tests scripts
+
+      - name: Workflow syntax (Snakemake)
+        run: uv run snakemake -s workflow/Snakefile --lint || true   # advisory: the DAG needs the data
+
+      - name: Tests (pytest)
+        run: uv run pytest -q --cov=wmh_multisite --cov-report=term

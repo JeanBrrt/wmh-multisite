@@ -1,0 +1,5 @@
+model,position,n_teams,score,rank_dice,rank_hd95_mm,rank_avd_pct,rank_lesion_recall,rank_lesion_f1
+resencm,9,58,0.05549,2,6,1,22,2
+resencm_da5,10,58,0.0575,4,8,2,22,2
+threshold,55,58,0.511,51,52,51,58,55
+wmhsynthseg,55,58,0.4886,57,41,56,53,49

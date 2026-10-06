@@ -1,0 +1,201 @@
+# wmh-multisite: end-to-end workflow (ROADMAP step 9.1, J-061).
+#
+# Stage-level rules: each rule runs one module of the package on every subject; the modules skip the
+# work already done, so re-running a rule is cheap. Two steps run on Kaggle (no local GPU large enough,
+# J-005, J-007): they are "external" rules that fail with instructions when their files are missing,
+# and are skipped when the files are there.
+#
+#   uv run snakemake -s workflow/Snakefile -n            # dry run: what would run
+#   uv run snakemake -s workflow/Snakefile --cores 4     # run what is missing
+#   uv run snakemake -s workflow/Snakefile --cores 4 results/tables/stats_ci.csv   # up to one target
+#   uv run snakemake -s workflow/Snakefile --cores 1 --touch      # once, on a project computed by hand:
+#                                                                   # mark the existing outputs as up to date
+#
+# ancient(): for the expensive and external steps, an input only has to exist (its date is ignored),
+# so that re-writing a report never triggers a new Kaggle training or an 8-hour registration.
+
+configfile: "config/config.yaml"
+
+PY = "uv run python -m wmh_multisite"
+RAW = config["paths"]["raw"]
+BIDS = config["paths"]["bids"]
+DER = config["paths"]["derivatives"] + "/wmh-multisite"
+NNUNET = config["paths"]["nnunet"]
+TABLES = config["paths"]["results"] + "/tables"
+FIGURES = config["paths"]["results"] + "/figures"
+FLAGS = DER + "/.workflow"
+
+NN = config["segmentation"]["nnunet"]
+MODEL_DIR = f"{NNUNET}/nnUNet_results/{NN['dataset_name']}/{{trainer}}__{NN['plans']}__{NN['configuration']}"
+TRAINERS = {k: v["trainer"] for k, v in NN["models"].items()}
+NORMALIZATIONS = ["none", "whitestripe", "histmatch"]   # 8.4 (zscore = the M3 of 5.5)
+EVALUATED = ["resencm", "resencm_da5", "resencmpre", "threshold", "wmhsynthseg"] + [f"threshold{n}" for n in NORMALIZATIONS]
+
+
+rule all:
+    input:
+        f"{TABLES}/stats_ci.csv",
+        f"{TABLES}/interobserver_summary.csv",
+        f"{TABLES}/stats_agreement.csv",
+        f"{TABLES}/mni_map_agreement.csv",
+        f"{TABLES}/qc_artifacts.csv",
+        f"{TABLES}/robustness_nnunet.csv",
+        "results/qc/qc_report.html",
+        f"{TABLES}/harmonization_site_classifier.csv",
+        f"{TABLES}/leaderboard_positions.csv",
+
+
+# --- Phase 2: data -----------------------------------------------------------------------------
+
+rule download:  # DataverseNL API, SHA-1 checked (J-026)
+    output: f"{RAW}/manifest.csv"
+    shell: f"{PY}.data.download"
+
+rule bids:  # BIDS 1.10 conversion + inventory (J-025, J-027)
+    input: ancient(f"{RAW}/manifest.csv")
+    output: f"{BIDS}/participants.tsv", f"{TABLES}/bids_inventory.csv"
+    shell: f"{PY}.data.bids"
+
+
+# --- Phase 3: preprocessing (J-036 order: rigid on raw images, HD-BET, N4 with the brain masks) -----
+
+rule register:  # rigid raw T1 -> raw FLAIR, QC against elastix (J-031, J-039)
+    input: ancient(f"{BIDS}/participants.tsv")
+    output: f"{DER}/registration_report.csv"
+    shell: f"{PY}.preproc.register --split all --jobs 4"
+
+rule brainmask:  # HD-BET on the local GPU, masks carried to the FLAIR grid (J-033)
+    input: ancient(f"{DER}/registration_report.csv")
+    output: f"{TABLES}/brainmask_qc.csv"
+    shell: f"{PY}.preproc.brainmask"
+
+rule bias:  # N4 with the HD-BET brain masks; T1 N4 resampled on the FLAIR grid (J-034, J-036)
+    input: ancient(f"{TABLES}/brainmask_qc.csv")
+    output: f"{DER}/n4_report.csv"
+    shell: f"{PY}.preproc.bias --split all --jobs 2"
+
+
+# --- Phase 5: segmentation ---------------------------------------------------------------------
+
+rule nnunet_export:  # Dataset001_WMH for Kaggle (J-032)
+    input: ancient(f"{DER}/n4_report.csv")
+    output: f"{NNUNET}/nnUNet_raw/{NN['dataset_name']}/dataset.json"
+    shell: f"{PY}.seg.nnunet"
+
+rule kaggle_nnunet_training:  # EXTERNAL: kaggle/03_nnunet_train.ipynb (resencm), 04_nnunet_train_da5.ipynb (DA5)
+    input: ancient(f"{NNUNET}/nnUNet_raw/{NN['dataset_name']}/dataset.json")
+    output: MODEL_DIR + "/fold_0/checkpoint_final.pth"
+    shell: "echo 'External step: train {wildcards.trainer} on Kaggle (kaggle/03 or 04 notebook) and copy nnUNet_results/ to " + NNUNET + "/' && exit 1"
+
+rule nnunet_infer:  # local GPU inference (J-040); model "<key>pre": on the organizers' pre/ images (J-057)
+    input: lambda w: ancient((MODEL_DIR + "/fold_0/checkpoint_final.pth").format(trainer=TRAINERS[w.model.removesuffix("pre")]))
+    output: touch(FLAGS + "/nnunet_{model}.done")
+    params: model=lambda w: w.model.removesuffix("pre"), inputs=lambda w: "challenge" if w.model.endswith("pre") else "ours"
+    wildcard_constraints: model="resencm|resencm_da5|resencmpre"
+    shell: f"{PY}.seg.nnunet_infer --split test --model {{params.model}} --inputs {{params.inputs}}"
+
+rule kaggle_wmhsynthseg:  # EXTERNAL: kaggle/05_wmhsynthseg.ipynb, parts 1-3, archives unzipped at the root (J-053)
+    input: ancient(f"{BIDS}/participants.tsv")
+    output: f"{DER}/sub-000/anat/sub-000_desc-wmhsynthseg1mm_dseg.nii.gz"
+    shell: "echo 'External step: run kaggle/05_wmhsynthseg.ipynb (PART 1, 2, 3) and unzip the archives at the repository root' && exit 1"
+
+rule threshold:  # M3: grid search on the training set, application (J-044); 8.4: other normalisations (J-055)
+    input: ancient(f"{DER}/n4_report.csv"), ancient(f"{DER}/sub-000/anat/sub-000_desc-wmhsynthseg1mm_dseg.nii.gz")
+    output: touch(FLAGS + "/threshold{norm}.done")
+    params: norm=lambda w: w.norm or "zscore"
+    wildcard_constraints: norm="|none|whitestripe|histmatch"
+    shell: f"{PY}.seg.threshold --tune --apply --split all --normalization {{params.norm}} --jobs 4"
+
+
+# --- Phase 6: evaluation -----------------------------------------------------------------------
+
+def segmentation_flag(model):
+    if model == "wmhsynthseg":
+        return ancient(f"{DER}/sub-000/anat/sub-000_desc-wmhsynthseg1mm_dseg.nii.gz")
+    if model.startswith("threshold"):
+        return FLAGS + f"/{model}.done"
+    return FLAGS + f"/nnunet_{model}.done"
+
+rule evaluate:  # official challenge metrics (J-012, J-042)
+    input: lambda w: segmentation_flag(w.model)
+    output: f"{TABLES}/evaluation_{{model}}.csv"
+    shell: f"{PY}.evaluate.metrics --model {{wildcards.model}} --split test"
+
+rule stats:  # bootstrap CIs, paired tests, seen vs unseen (J-047)
+    input: expand(f"{TABLES}/evaluation_{{m}}.csv", m=EVALUATED)
+    output: f"{TABLES}/stats_ci.csv", f"{TABLES}/stats_paired.csv", f"{TABLES}/stats_seen_unseen.csv"
+    shell: f"{PY}.evaluate.stats"
+
+rule interobserver:  # human ceiling (J-046)
+    input: ancient(MODEL_DIR.format(trainer=TRAINERS["resencm"]) + "/fold_0/checkpoint_final.pth")
+    output: f"{TABLES}/interobserver_summary.csv"
+    shell: f"{PY}.evaluate.interobserver"
+
+rule figures:  # summary figures, leaderboard position (J-060)
+    input: f"{TABLES}/stats_ci.csv", f"{TABLES}/interobserver_summary.csv"
+    output: f"{TABLES}/leaderboard_positions.csv", f"{FIGURES}/dice_by_method_and_scanner.png"
+    shell: f"{PY}.viz.figures"
+
+
+# --- Phase 7: biomarkers -------------------------------------------------------------------------
+
+rule biomarkers:  # volumes + ICV, periventricular / deep, lesions (J-048, J-050, J-053)
+    input: expand(f"{TABLES}/evaluation_{{m}}.csv", m=["resencm", "resencm_da5", "threshold", "wmhsynthseg"])
+    output: f"{TABLES}/biomarkers.csv"
+    shell: f"{PY}.biomarkers.table"
+
+rule agreement:  # Bland-Altman, ICC, bias per site (J-049)
+    input: f"{TABLES}/biomarkers.csv"
+    output: f"{TABLES}/stats_agreement.csv", f"{TABLES}/stats_agreement_by_scanner.csv"
+    shell: f"{PY}.biomarkers.agreement"
+
+rule syn_mni:  # SyN CC on the 2 mm MNI template, all subjects (J-054; ~8 h with 12 threads)
+    input: ancient(f"{DER}/n4_report.csv")
+    output: touch(FLAGS + "/syn_cc2mm.done")
+    shell: "uv run python scripts/syn_benchmark.py --subjects all --variants cc2mm_100-70-50-20 --jobs 4 --threads 3"
+
+rule mni_maps:  # lesion frequency maps per site and source (J-056)
+    input: FLAGS + "/syn_cc2mm.done", f"{TABLES}/biomarkers.csv"
+    output: f"{TABLES}/mni_map_agreement.csv"
+    shell: f"{PY}.biomarkers.mni"
+
+
+# --- Phase 4: image quality control ---------------------------------------------------------------
+
+rule qc_iqm:  # MRIQC-like IQMs, rules A and B of J-028 (J-051)
+    input: ancient(f"{DER}/n4_report.csv"), ancient(f"{DER}/sub-000/anat/sub-000_desc-wmhsynthseg1mm_dseg.nii.gz")
+    output: f"{TABLES}/qc_iqm.csv"
+    shell: f"{PY}.qc.iqm"
+
+rule qc_outliers:
+    input: f"{TABLES}/qc_iqm.csv", f"{TABLES}/evaluation_resencm.csv"
+    output: f"{TABLES}/qc_flags.csv"
+    shell: f"{PY}.qc.outliers"
+
+rule qc_artifacts:
+    input: f"{TABLES}/qc_flags.csv"
+    output: f"{TABLES}/qc_artifacts.csv"
+    shell: f"{PY}.qc.artifacts"
+
+rule qc_report:  # local only, never published (patient thumbnails)
+    input: f"{TABLES}/qc_flags.csv"
+    output: "results/qc/qc_report.html"
+    shell: f"{PY}.viz.report"
+
+rule robustness:  # nnU-Net on degraded FLAIRs (J-058)
+    input: f"{TABLES}/qc_flags.csv", FLAGS + "/nnunet_resencm.done"
+    output: f"{TABLES}/robustness_nnunet.csv"
+    shell: f"{PY}.qc.robustness"
+
+
+# --- Phase 8: harmonisation ----------------------------------------------------------------------
+
+rule nawm_features:  # rules A and B of J-028 (J-059)
+    input: ancient(f"{DER}/n4_report.csv"), ancient(f"{DER}/sub-000/anat/sub-000_desc-wmhsynthseg1mm_dseg.nii.gz")
+    output: f"{TABLES}/nawm_features.csv"
+    shell: f"{PY}.harmonize.features"
+
+rule combat:  # site classifier, ComBat learnt on the training folds (J-059)
+    input: f"{TABLES}/nawm_features.csv", f"{TABLES}/biomarkers.csv"
+    output: f"{TABLES}/harmonization_site_classifier.csv", f"{TABLES}/harmonization_biology.csv"
+    shell: f"{PY}.harmonize.combat"
