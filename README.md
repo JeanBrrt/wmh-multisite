@@ -75,15 +75,19 @@ Les données sont téléchargées via l'API Dataverse et converties au format **
 |---|---|---|---|---|
 | Médiane | 0,998 | 0,14 | 0,29 | 0,11 |
 | Pire cas | 0,974 | 0,69 | 1,36 | 0,75 |
-| Médiane par scanner | 0,988 (GE 1,5T) à 0,999 (Utrecht) | 0,11 à 0,46 | 0,18 à 0,84 | 0,06 à 0,35 |
+| Médiane, Utrecht Philips 3T | 0,999 | 0,11 | 0,18 | 0,06 |
+| Médiane, Singapour Siemens 3T | 0,998 | 0,13 | 0,28 | 0,12 |
+| Médiane, Amsterdam GE 3T | 0,994 | 0,21 | 0,45 | 0,17 |
+| Médiane, Amsterdam Philips 3T | 0,994 | 0,22 | 0,51 | 0,20 |
+| Médiane, Amsterdam GE 1,5T | 0,988 | 0,46 | 0,84 | 0,35 |
 
-| Corrélation des champs de biais N4 / SPM12 (médiane, 60 sujets d'entraînement) | Amsterdam GE 3T | Singapour | Utrecht |
+| Corrélation SPM12 (médiane, 60 sujets d'entraînement) | Amsterdam GE 3T | Singapour | Utrecht |
 |---|---|---|---|
 | FLAIR | 0,88 | 0,74 | 0,85 |
 | T1 | 0,94 | 0,97 | 0,98 |
 
 
-Les deux recalages sont équivalents à une fraction de voxel près, et le même modèle nnU-Net obtient exactement le même Dice (0,803 contre 0,802, p = 0,91). Notre prétraitement n'apporte pas de gain de performance mais plutôt la traçabilité depuis les données brutes.
+Les deux recalages sont équivalents à une fraction de voxel près, . Notre prétraitement n'apporte pas de gain de performance mais plutôt la traçabilité depuis les données brutes.
 
 Pour les cartes de groupe, chaque sujet est recalé sur le modèle **MNI152** par un recalage non linéaire **SyN**. La corrélation croisée (CC) remplace l'information mutuelle comme critère : elle est plus gourmande en calcul, mais indispensable pour suivre les **ventricules dilatés** des sujets atrophiés, que le réglage par défaut ne ramène pas dans le contour du modèle (sur un sujet atrophié : volume ventriculaire estimé 86 ml avec CC contre 26 ml avec le réglage par défaut). Le calcul sur le modèle à 2 mm divise le temps par 8 (6 min au lieu de 50 par sujet) pour une qualité presque identique (J-054).
 
