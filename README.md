@@ -209,7 +209,6 @@ src/wmh_multisite/
   viz/                      figures, rapport QC
 workflow/Snakefile          chaîne complète
 kaggle/                     notebooks des étapes sur GPU distant
-notebooks/                  explorations et contrôles visuels (sorties retirées)
 containers/, hpc/           Docker, Apptainer, SLURM
 tests/                      155 tests
 results/tables, figures     résultats agrégés (aucune image de patient)
