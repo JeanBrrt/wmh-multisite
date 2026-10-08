@@ -446,15 +446,17 @@ Biais : moyenne des d = ln(source / O1), puis exponentielle (moyenne géométriq
 <a id="d3"></a>
 #### D3. Biais du volume de HSB par scanner : rapport moyen à O1 [IC 95 % bootstrap] ; p de Wilcoxon contre 0 (p de Holm sur 116 tests)
 
-| Scanner | M1 nnU-Net (test) | M3 seuillage (test) | Expert O3 (entraînement) | Expert O4 (entraînement) |
-|---|---|---|---|---|
-| Utrecht Philips 3T | **0,87** [0,80-0,95] ; 0,001 (0,08) | **1,72** [1,31-2,26] ; < 0,001 (0,008) | 1,13 [1,04-1,25] ; 0,003 (0,23) | 0,96 [0,84-1,10] ; 0,08 (1) |
-| Singapour Siemens 3T | 1,03 [0,97-1,10] ; 0,11 (1) | 0,79 [0,65-0,98] ; 0,03 (1) | 0,90 [0,83-0,97] ; 0,007 (0,45) | **0,80** [0,76-0,85] ; < 0,001 (0,003) |
-| Amsterdam GE 3T | 1,01 [0,92-1,09] ; 0,05 (1) | 1,28 [1,11-1,48] ; 0,007 (0,43) | 0,89 [0,79-0,99] ; 0,07 (1) | 1,00 [0,91-1,09] ; 0,78 (1) |
-| Amsterdam Philips 3T (inconnu) | 0,98 [0,81-1,13] ; 0,49 (1) | 1,16 [0,90-1,54] ; 0,49 (1) | — | — |
-| Amsterdam GE 1,5T (inconnu) | **1,10** [1,06-1,14] ; 0,004 (0,27) | 0,96 [0,76-1,22] ; 0,92 (1) | — | — |
+| Scanner | M1 nnU-Net (test) | M3 seuillage (test) | M2 WMH-SynthSeg (test) | Expert O3 (entraînement) | Expert O4 (entraînement) |
+|---|---|---|---|---|---|
+| Utrecht Philips 3T | **0,87** [0,80-0,95] ; 0,001 (0,08) | **1,72** [1,31-2,26] ; < 0,001 (0,008) | 2,25 [1,60-3,20] ; < 0,001 (0,003) | 1,13 [1,04-1,25] ; 0,003 (0,23) | 0,96 [0,84-1,10] ; 0,08 (1) |
+| Singapour Siemens 3T | 1,03 [0,97-1,10] ; 0,11 (1) | 0,79 [0,65-0,98] ; 0,03 (1) | 1,85 [1,42-2,47] ; < 0,001 (0,003) | 0,90 [0,83-0,97] ; 0,007 (0,45) | **0,80** [0,76-0,85] ; < 0,001 (0,003) |
+| Amsterdam GE 3T | 1,01 [0,92-1,09] ; 0,05 (1) | 1,28 [1,11-1,48] ; 0,007 (0,43) | 3,32 [2,46-4,49] ; < 0,001 (< 0,001) | 0,89 [0,79-0,99] ; 0,07 (1) | 1,00 [0,91-1,09] ; 0,78 (1) |
+| Amsterdam Philips 3T (inconnu) | 0,98 [0,81-1,13] ; 0,49 (1) | 1,16 [0,90-1,54] ; 0,49 (1) | 2,43 [1,60-3,92] ; 0,002 (0,16) | — | — |
+| Amsterdam GE 1,5T (inconnu) | **1,10** [1,06-1,14] ; 0,004 (0,27) | 0,96 [0,76-1,22] ; 0,92 (1) | 2,84 [1,59-6,22] ; 0,006 (0,39) | — | — |
 
-Les experts n'ont annoté que les 3 scanners d'entraînement.
+Les experts n'ont annoté que les 3 scanners d'entraînement. M2 surestime sur tous les scanners (× 1,9 à × 3,3), sans différence démontrée entre eux (Kruskal-Wallis p = 0,10, tableau D2) : son biais est fort mais ne crée pas d'effet de site, contrairement à celui de M1, M3 et des experts.
+
+Ce tableau ne montre que le volume total et 5 sources. Le biais par scanner des autres biomarqueurs (volumes périventriculaire et profond, nombre de lésions) et des autres sources (M1 DA5, M1 sur les 12 cas de validation) est dans `results/tables/stats_agreement_by_scanner.csv`. La correction de Holm porte sur l'ensemble de ces 116 tests, pas seulement sur ceux affichés ici.
 
 <a id="d4"></a>
 #### D4. Accord des cartes de fréquence lésionnelle (espace MNI, 2 mm) avec la carte de O1 : corrélation de Pearson voxel à voxel (110 cas de test)
