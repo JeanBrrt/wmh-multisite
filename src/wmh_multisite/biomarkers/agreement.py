@@ -10,7 +10,10 @@ scanner?": a site-dependent bias would create a site effect that does not come f
         |   per subject: d = ln(rater / O1)        (volumes span 0.8 to 195 ml: errors grow with the
         |                                           volume, Spearman 0.71 in ml, -0.31 on the log scale)
         v
-    1. Bland-Altman: bias = mean(d), limits of agreement = bias +/- 1.96 SD(d), back-transformed to ratios
+    1. Bland-Altman: bias = mean(d); limits of agreement = 2.5th and 97.5th percentiles of d (empirical,
+       J-066: d is skewed, so bias +/- 1.96 SD misplaces them), with a bootstrap CI stratified by scanner;
+       the parametric limits (bias +/- 1.96 SD), skewness and Shapiro-Wilk p are kept for comparison;
+       everything back-transformed to ratios
     2. ICC(A,1), absolute agreement, on ln(value), with a bootstrap CI stratified by scanner
     3. bias per scanner (bootstrap CI, Wilcoxon against 0, Holm) + Kruskal-Wallis across scanners:
        does the bias depend on the site?
@@ -75,9 +78,24 @@ def icc_a1(x: np.ndarray) -> float:
 
 
 def bland_altman(d: np.ndarray) -> dict[str, float]:
-    """Bias and 95 % limits of agreement of the differences ``d``."""
+    """Bias and 95 % limits of agreement of the differences ``d``.
+
+    ``loa_low`` / ``loa_high``: empirical 2.5th and 97.5th percentiles, the non-parametric limits of
+    Bland and Altman (1999), valid whatever the shape of ``d``. ``loa_param_*``: bias +/- 1.96 SD, which
+    assume a normal, hence symmetric, ``d``; kept to show how far that assumption is from the data.
+    """
     bias, sd = float(d.mean()), float(d.std(ddof=1))
-    return {"bias": bias, "sd": sd, "loa_low": bias - 1.96 * sd, "loa_high": bias + 1.96 * sd}
+    low, high = np.percentile(d, [2.5, 97.5])
+    return {
+        "bias": bias,
+        "sd": sd,
+        "loa_low": float(low),
+        "loa_high": float(high),
+        "loa_param_low": bias - 1.96 * sd,
+        "loa_param_high": bias + 1.96 * sd,
+        "skewness": float(stats.skew(d)),
+        "p_shapiro": float(stats.shapiro(d).pvalue) if len(d) >= 3 else float("nan"),
+    }
 
 
 def transform(values: pd.Series, kind: str) -> pd.Series:
@@ -119,7 +137,12 @@ def agreement(
     d = tr - tref
     ba = bland_altman(d)
     pair = np.column_stack([tr, tref])
-    boot = [icc_a1(pair[idx]) for idx in stratified_indices(q.scanner.to_numpy(), n_boot, rng)]
+    boot, boot_low, boot_high = [], [], []
+    for idx in stratified_indices(q.scanner.to_numpy(), n_boot, rng):
+        boot.append(icc_a1(pair[idx]))
+        low, high = np.percentile(d[idx], [2.5, 97.5])
+        boot_low.append(low)
+        boot_high.append(high)
     alpha = (1 - level) / 2
     by_site = [d[(q.scanner == s).to_numpy()] for s in sorted(q.scanner.unique())]
     back = np.exp if kind == "log" else (lambda v: v)  # log1p: differences stay on the log scale
@@ -129,7 +152,15 @@ def agreement(
         "scale": "ratio" if kind == "log" else "difference of ln(x + 1)",
         "bias": float(back(ba["bias"])),
         "loa_low": float(back(ba["loa_low"])),
+        "loa_low_ci_low": float(back(np.quantile(boot_low, alpha))),
+        "loa_low_ci_high": float(back(np.quantile(boot_low, 1 - alpha))),
         "loa_high": float(back(ba["loa_high"])),
+        "loa_high_ci_low": float(back(np.quantile(boot_high, alpha))),
+        "loa_high_ci_high": float(back(np.quantile(boot_high, 1 - alpha))),
+        "loa_param_low": float(back(ba["loa_param_low"])),
+        "loa_param_high": float(back(ba["loa_param_high"])),
+        "skewness": ba["skewness"],
+        "p_shapiro": ba["p_shapiro"],
         "mean_diff_raw": float((q.rater - q.ref).mean()),
         "icc_a1": icc_a1(pair),
         "icc_ci_low": float(np.quantile(boot, alpha)),
@@ -183,6 +214,8 @@ def bland_altman_figure(p: pd.DataFrame, title: str, path) -> None:
     for v, style in [(ba["bias"], "-"), (ba["loa_low"], "--"), (ba["loa_high"], "--")]:
         ax.axhline(np.exp(v), color="black", ls=style, lw=0.8)
         ax.text(mean.max(), np.exp(v), f" {np.exp(v):.2f}", va="center", fontsize=8)
+    for v in (ba["loa_param_low"], ba["loa_param_high"]):  # bias +/- 1.96 SD, for comparison
+        ax.axhline(np.exp(v), color="grey", ls=":", lw=0.8)
     ax.axhline(1, color="grey", lw=0.5)
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -197,7 +230,7 @@ def bland_altman_figure(p: pd.DataFrame, title: str, path) -> None:
     ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%g"))
     ax.set_xlabel("WMH volume, geometric mean of the two (ml)")
     ax.set_ylabel("ratio to O1")
-    ax.set_title(title, fontsize=10)
+    ax.set_title(f"{title}\nlimits: 2.5-97.5th percentiles (dashed), bias +/- 1.96 SD (dotted)", fontsize=9)
     ax.legend(fontsize=7, loc="best")
     fig.tight_layout()
     fig.savefig(path, dpi=120)
