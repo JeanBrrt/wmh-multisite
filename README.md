@@ -12,7 +12,7 @@ Ce projet s'articule autour de quatre questions :
 > (1) repérer les images problématiques, (2) segmenter les lésions de façon fiable, y compris sur un scanner jamais vu,
 > (3) en tirer des biomarqueurs comparables d'un site à l'autre, et (4) retirer l'empreinte du scanner sans effacer la biologie ?
 
-Chaque choix est justifié, avec ses alternatives et ses preuves, dans le journal de décisions [`justification.md`](justification.md) (J-001 à J-066). L'avancement est suivi dans [`ROADMAP.md`](ROADMAP.md).
+Chaque choix est justifié, avec ses alternatives et ses preuves, dans le journal de décisions [`justification.md`](justification.md) (J-001 à J-067). L'avancement est suivi dans [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -160,7 +160,7 @@ On calcule les biomarqueurs suivant pour chaque sujet et chaque source de segmen
 **Méthodes statistiques.**
 - **Bland-Altman**: le **biais** (moyenne des d ramenée en rapport par une exponentielle) dit si la source mesure trop ou trop peu en moyenne et les **limites d'accord** encadrent l'erreur sur 95 % des patients pris un par un. La formule classique (biais ± 1,96 écart type) suppose que les d suivent une loi normale, donc symétrique. Ce n'est pas le cas ici : pour M1, les erreurs ont une longue queue du côté des sous-estimations (asymétrie −1,4 ; normalité rejetée par le test de Shapiro-Wilk, p < 0,001). On lit donc directement les limites dans les données : les **2,5e et 97,5e centiles des d** (limites « empiriques »).
 - **ICC d'accord absolu** (ICC(A,1), McGraw et Wong) : sur le logarithme des volumes, avec un IC bootstrap stratifié par scanner : la part de la variabilité due aux vraies différences entre patients plutôt qu'aux erreurs de mesure (1 = accord parfait). Contrairement à une corrélation il pénalise un écart systématique (une méthode qui doublerait tous les volumes aurait une corrélation de 1).
-- **Biais par site**, deux analyses complémentaires : (1) **sur chaque scanner**, le biais avec son IC bootstrap et un test de Wilcoxon contre 0 (le biais de ce scanner est-il différent de zéro ?), corrigé par Holm sur les 116 tests ([tableau D3](#d3)) ; (2) **entre les scanners**, un test de Kruskal-Wallis par source, qui compare les erreurs des 5 scanners entre elles (le biais est-il le même partout ?) ([tableau D2](#d2), dernière colonne).
+- **Biais par site** : **sur chaque scanner**, le biais avec son IC bootstrap et un test de Wilcoxon contre 0 (le biais de ce scanner est-il différent de zéro ?), corrigé par Holm sur les 116 tests ([tableau D3](#d3)) ; **entre les scanners**, un test de Kruskal-Wallis par source, qui compare les erreurs des 5 scanners entre elles ([tableau D2](#d2), dernière colonne).
 - **Cartes MNI** : chaque masque est transporté dans l'espace commun (FLAIR → T1 → MNI), puis on calcule la proportion de sujets ayant une lésion en chaque voxel. L'accord avec O1 est la **corrélation de Pearson voxel à voxel** entre les cartes (même motif spatial = 1), complétée par des cartes de différence qui montrent où se situent les écarts.
 
 **Résultats clés.**
@@ -169,7 +169,7 @@ On calcule les biomarqueurs suivant pour chaque sujet et chaque source de segmen
 - **Les lésions profondes sont moins bien mesurées** que les périventriculaires : M1 les sous-estime de 13 % (0,87 [0,31 ; 1,40], ICC 0,964, contre 1,00 [0,54 ; 1,32] et 0,982). Les experts aussi (0,86 et 0,78) : O1 annote plus de lésions profondes que les autres ([tableau D2](#d2)).
 - **Nombre de lésions** : M1 en compte environ 18 % de moins que O1 (ICC 0,89), au niveau des experts (0,85 et 0,88) ; M3, qui élimine les petites lésions, est à 0,31 ([tableau D2](#d2)).
 - **Le biais dépend du site pour M1, M3 et les deux experts** (Kruskal-Wallis p < 0,001), mais pas pour M2 (p = 0,10), dont la surestimation est forte mais uniforme. M1 sous-estime d'environ 13 % à Utrecht (0,87 [0,80 ; 0,95]) et surestime d'environ 10 % sur GE 1,5T (1,10 [1,06 ; 1,14]) ; ces écarts ne restent pas significatifs après la correction de Holm (p = 0,08 et 0,27). Les experts ont aussi des biais de site : O4 sous-estime de 20 % à Singapour (p Holm = 0,003) ([tableau D3](#d3)). Une partie du « biais de site » d'une méthode reflète donc le style de la référence sur certains sites, et, sans données démographiques, un biais associé au site peut venir de la population autant que du scanner.
-- **Les lésions sont placées aux bons endroits** : la carte de M1 corrèle à 0,995 avec celle de O1 (0,97 à 0,99 par site), contre 0,90 pour M3 et 0,88 pour M2 (0,67 sur GE 1,5T). Les cartes de différence montrent que l'excès de M2 se concentre dans un liseré le long des ventricules, et que M3 fait des faux positifs sur la ligne médiane ([tableau D4](#d4)).
+- **Les lésions sont placées aux bons endroits** : la carte de M1 corrèle à 0,995 avec celle de O1 (0,97 à 0,99 par site), comme celles des experts O3 et O4 (0,993 et 0,992, sur les cas d'entraînement), contre 0,90 pour M3 et 0,88 pour M2 (0,67 sur GE 1,5T). Les cartes de différence montrent que l'excès de M2 se concentre dans un liseré le long des ventricules, et que M3 fait des faux positifs sur la ligne médiane ([tableau D4](#d4)).
 
 ### 6. Harmonisation
 
@@ -233,7 +233,7 @@ notebooks/                  explorations et contrôles visuels (sorties retirée
 containers/, hpc/           Docker, Apptainer, SLURM
 tests/                      155 tests
 results/tables, figures     résultats agrégés (aucune image de patient)
-justification.md            journal des décisions (J-001 à J-066)
+justification.md            journal des décisions (J-001 à J-067)
 ```
 
 ## Limites
@@ -459,16 +459,18 @@ Les experts n'ont annoté que les 3 scanners d'entraînement. M2 surestime sur t
 Ce tableau ne montre que le volume total et 5 sources. Le biais par scanner des autres biomarqueurs (volumes périventriculaire et profond, nombre de lésions) et des autres sources (M1 DA5, M1 sur les 12 cas de validation) est dans `results/tables/stats_agreement_by_scanner.csv`. La correction de Holm porte sur l'ensemble de ces 116 tests, pas seulement sur ceux affichés ici.
 
 <a id="d4"></a>
-#### D4. Accord des cartes de fréquence lésionnelle (espace MNI, 2 mm) avec la carte de O1 : corrélation de Pearson voxel à voxel (110 cas de test)
+#### D4. Accord des cartes de fréquence lésionnelle (espace MNI, 2 mm) avec la carte de O1 : corrélation de Pearson voxel à voxel
 
-| Site | M1 nnU-Net | M3 seuillage | M2 WMH-SynthSeg |
-|---|---|---|---|
-| **Tous** | **0,995** | 0,903 | 0,879 |
-| Utrecht Philips 3T | 0,979 | 0,855 | 0,859 |
-| Singapour Siemens 3T | 0,992 | 0,886 | 0,881 |
-| Amsterdam GE 3T | 0,987 | 0,887 | 0,816 |
-| Amsterdam Philips 3T (inconnu) | 0,969 | 0,848 | 0,796 |
-| Amsterdam GE 1,5T (inconnu) | 0,970 | 0,887 | 0,669 |
+| Site | M1 nnU-Net (test) | M3 seuillage (test) | M2 WMH-SynthSeg (test) | Expert O3 (entraînement) | Expert O4 (entraînement) |
+|---|---|---|---|---|---|
+| **Tous** | **0,995** | 0,903 | 0,879 | 0,993 | 0,992 |
+| Utrecht Philips 3T | 0,979 | 0,855 | 0,859 | 0,985 | 0,987 |
+| Singapour Siemens 3T | 0,992 | 0,886 | 0,881 | 0,986 | 0,977 |
+| Amsterdam GE 3T | 0,987 | 0,887 | 0,816 | 0,972 | 0,979 |
+| Amsterdam Philips 3T (inconnu) | 0,969 | 0,848 | 0,796 | — | — |
+| Amsterdam GE 1,5T (inconnu) | 0,970 | 0,887 | 0,669 | — | — |
+
+Chaque carte est comparée à celle de O1 **sur les mêmes sujets** : les 110 cas de test pour les méthodes, les 60 cas d'entraînement pour les experts (seuls cas qu'ils ont annotés). Les deux groupes de sujets diffèrent, et une carte faite sur moins de sujets est plus bruitée, ce qui baisse mécaniquement la corrélation (60 sujets contre 110 au total, 20 contre 30 par site) : la comparaison avec les experts est indicative.
 
 ![Cartes de fréquence lésionnelle par méthode, moins O1](results/figures/mni_frequency_methods_minus_O1.png)
 
