@@ -141,26 +141,44 @@ Avec quelques variantes :
 - **M1 surpasse M3 et M2 sur les 5 métriques** (p Holm < 1e-9, [tableau A7](#a7)). M3 et M2 ne se dominent pas : M3 a le meilleur recouvrement et le meilleur volume, M2 trouve plus de lésions mais sur-segmente (AVD de 293 %).
 - **Ni l'augmentation forte (DA5) ni le prétraitement des organisateurs ne changent le résultat de M1** (différences de Dice de +0,005 et −0,001, p Holm = 1, [tableau A7](#a7)).
 - **M1 est stable d'un scanner à l'autre** : Dice de 0,776 (Amsterdam Philips) à 0,834 (Singapour) ([tableau A6](#a6)).
-- **M1 ne se dégrade pas de façon démontrée sur les 2 scanners jamais vus à l'entraînement.** Son Dice est de 0,790 sur les 20 cas de ces scanners, contre 0,805 sur les 90 cas des scanners vus : une différence de −0,015, d'intervalle de confiance [−0,066 ; +0,030] et de p = 0,45 ([tableau A8](#a8)). Les autres méthodes (M2, M3 et les variantes) ne montrent pas non plus d'écart significatif entre scanners vus et inconnus. Réserve : avec seulement 20 cas, l'intervalle est large, et une petite perte (jusqu'à environ 0,07 de Dice) ne peut pas être exclue.
+- **M1 ne se dégrade pas de façon démontrée sur les 2 scanners jamais vus à l'entraînement.** Son Dice est de 0,790 sur les 20 cas de ces scanners contre 0,805 sur les 90 cas des scanners vus, une différence de −0,015 avec un intervalle de confiance [−0,066 ; +0,030] et un p = 0,45 ([tableau A8](#a8)). Les autres méthodes (M2, M3 et les variantes) ne montrent pas non plus d'écart significatif entre scanners vus et inconnus. Cependant avec seulement 20 cas l'intervalle est large et une petite perte ne peut pas être exclue.
 - **M1 est au niveau des experts** : sur les 12 cas partagés, Dice de 0,815 contre 0,757 et 0,781 pour O3 et O4 ([tableau A9](#a9)) et deux experts indépendants ne s'accordent qu'à 0,74 à 0,76. Ce n'est pas forcément « mieux qu'un expert » puisque M1 a pu apprendre le style de labelisation de O1 contre lequel il est jugé.
 
 ### 5. Biomarqueurs
 
-Volume de HSB (ml et % du volume intracrânien), découpe **périventriculaire / profonde** (règle des 10 mm autour des ventricules segmentés par WMH-SynthSeg), nombre et taille des lésions, **cartes de fréquence lésionnelle dans l'espace MNI** par site. Accord avec la référence : **Bland-Altman** sur l'échelle logarithmique (les erreurs croissent avec le volume), **ICC** d'accord absolu, biais par site.
+**But.** L'évaluation (section 4) juge la segmentation voxel par voxel. Une étude clinique, elle, utilise **un chiffre par patient** (« 12 ml de lésions, surtout périventriculaires »), qui alimentera ensuite un modèle pronostique. La question devient : **ce chiffre est-il juste, et est-il aussi juste sur tous les scanners ?** Un biais qui dépend du site créerait un faux effet de site dans une étude multicentrique.
 
-- Volume de HSB : **ICC 0,982 pour M1, au niveau des experts O3 et O4 (0,981 et 0,977)** ; M3 0,814, M2 0,372 ([tableau A10](#a10)).
-- Charge médiane (O1) de 0,44 % (Amsterdam GE 3T) à 1,18 % (Singapour) du volume intracrânien.
-- Lésions **profondes** moins bien mesurées que périventriculaires (M1 : rapport 0,87 [0,37-2,04], ICC 0,964, contre 1,00 [0,64-1,56], ICC 0,982).
-- Le biais dépend du site pour toutes les sources, **experts compris** (Kruskal-Wallis p < 0,001) : M1 sous-estime à Utrecht (0,87), mais l'expert O4 aussi à Singapour (0,80). Une partie du « biais de site » reflète le style de la référence.
-- Cartes MNI : corrélation avec la carte de O1 de **0,995 pour M1**, 0,90 pour M3, 0,88 pour M2, dont l'excès se concentre dans un liseré le long des ventricules.
+**Biomarqueurs calculés** pour chaque sujet et chaque source de segmentation (O1, M1, M2, M3, DA5 ; O3 et O4 sur l'entraînement), après retrait des zones « autre pathologie » :
+- **volume de HSB** (ml), avec le volume exact du voxel, qui varie de 1,75 à 4,72 mm³ selon le scanner ; et en **% du volume intracrânien** (ICV, tiré de la segmentation de WMH-SynthSeg), qui ne diminue pas avec l'atrophie ;
+- **volumes périventriculaire et profond** : un voxel de HSB est périventriculaire s'il est à 10 mm ou moins des ventricules latéraux (segmentés par WMH-SynthSeg), distances en millimètres réels ;
+- **nombre de lésions** (composantes connexes 3D, comme le script officiel), dont celles d'au moins 10 mm³ pour que le compte soit comparable entre résolutions ;
+- **cartes de fréquence lésionnelle** dans l'espace MNI, par site et par source.
+
+Les volumes obtenus sont identiques à ceux de l'évaluation officielle à 5e-5 ml près. Valeurs de référence (O1, 170 sujets) : volume médian 11,2 ml (0,8 à 195 ml), de 0,44 % de l'ICV (Amsterdam GE 3T) à 1,18 % (Singapour), 80 à 87 % de lésions périventriculaires selon le site ([tableau A10](#a10)).
+
+**Protocole d'accord.** Chaque source est comparée à O1 : M1, DA5, M3 et M2 sur les 110 cas de test ; les experts O3 et O4 sur les 60 cas d'entraînement, qui donnent la **référence humaine**. Pour chaque sujet, on calcule **d = ln(source / O1)**. Le logarithme transforme les erreurs en rapports (« 10 % de trop »), car l'erreur absolue grandit avec le volume (corrélation de Spearman de 0,71 entre l'erreur en ml et le volume, −0,31 sur l'échelle logarithmique).
+
+**Méthodes statistiques.**
+- **Bland-Altman**, la méthode de référence pour comparer deux mesures d'une même grandeur : le **biais** (moyenne des d, ramenée en rapport) dit si la source mesure trop ou trop peu en moyenne ; les **limites d'accord** (biais ± 1,96 écart type) encadrent l'erreur sur 95 % des patients pris un par un.
+- **ICC d'accord absolu** (ICC(A,1), McGraw et Wong) sur le logarithme des volumes, avec un IC bootstrap stratifié par scanner : la part de la variabilité due aux vraies différences entre patients plutôt qu'aux erreurs de mesure (1 = accord parfait). Contrairement à une corrélation, il pénalise un écart systématique (une méthode qui doublerait tous les volumes aurait une corrélation de 1).
+- **Biais par site** : biais de chaque scanner avec son IC bootstrap et un test de Wilcoxon contre 0, corrigés par Holm sur les 116 tests ; puis un **test de Kruskal-Wallis** pour savoir si le biais diffère d'un scanner à l'autre.
+- **Cartes MNI** : chaque masque est transporté dans l'espace commun (FLAIR → T1 → MNI), puis on calcule la proportion de sujets ayant une lésion en chaque voxel. L'accord avec O1 est la **corrélation de Pearson voxel à voxel** entre les cartes (même motif spatial = 1), complétée par des cartes de différence qui montrent où se situent les écarts.
+
+**Résultats clés.**
+- **M1 mesure le volume aussi bien qu'un second expert** : rapport moyen 0,98, limites d'accord [0,62 ; 1,55], ICC 0,982, contre 0,97 [0,60 ; 1,57] et 0,981 pour O3, et 0,91 [0,55 ; 1,51] et 0,977 pour O4 ([tableau A11](#a11)). Les limites d'accord restent larges même entre experts : pour un patient donné, un second expert peut donner de 0,6 à 1,6 fois le volume de O1. C'est la marge réaliste de mesure d'un volume de HSB.
+- **M3 est juste en moyenne mais imprécis par patient** (1,18 [0,33 ; 4,14], ICC 0,81) ; **M2 surestime d'un facteur 2,4** (ICC 0,37) et n'est pas utilisable comme biomarqueur sur ce protocole ([tableau A11](#a11)).
+- **Les lésions profondes sont moins bien mesurées** que les périventriculaires : M1 les sous-estime de 13 % (0,87 [0,37 ; 2,04], ICC 0,964, contre 1,00 [0,64 ; 1,56] et 0,982). Les experts aussi (0,86 et 0,78) : O1 annote plus de lésions profondes que les autres ([tableau A11](#a11)).
+- **Nombre de lésions** : M1 en compte environ 18 % de moins que O1 (ICC 0,89), au niveau des experts (0,85 et 0,88) ; M3, qui élimine les petites lésions, est à 0,31 ([tableau A11](#a11)).
+- **Le biais dépend du site pour M1, M3 et les deux experts** (Kruskal-Wallis p < 0,001), mais pas pour M2 (p = 0,10), dont la surestimation est forte mais uniforme. M1 sous-estime d'environ 13 % à Utrecht (0,87 [0,80 ; 0,95]) et surestime d'environ 10 % sur GE 1,5T (1,10 [1,06 ; 1,14]) ; ces écarts ne restent pas significatifs après la correction de Holm (p = 0,08 et 0,27). Les experts ont aussi des biais de site : O4 sous-estime de 20 % à Singapour (p Holm = 0,003) ([tableau A12](#a12)). Une partie du « biais de site » d'une méthode reflète donc le style de la référence sur certains sites, et, sans données démographiques, un biais associé au site peut venir de la population autant que du scanner.
+- **Les lésions sont placées aux bons endroits** : la carte de M1 corrèle à 0,995 avec celle de O1 (0,97 à 0,99 par site), contre 0,90 pour M3 et 0,88 pour M2 (0,67 sur GE 1,5T). Les cartes de différence montrent que l'excès de M2 se concentre dans un liseré le long des ventricules, et que M3 fait des faux positifs sur la ligne médiane ([tableau A13](#a13)).
 
 ### 6. Harmonisation
 
-**Normalisation d'intensité**, testée par son effet sur le seuillage, site par site : sans normalisation, le seuillage s'effondre (Dice 0,203, 0,00 sur 2 scanners) ; les trois normalisations par image suppriment l'effet du site, et la plus simple, le z-score robuste, est la meilleure (0,595) ([tableau A11](#a11)).
+**Normalisation d'intensité**, testée par son effet sur le seuillage, site par site : sans normalisation, le seuillage s'effondre (Dice 0,203, 0,00 sur 2 scanners) ; les trois normalisations par image suppriment l'effet du site, et la plus simple, le z-score robuste, est la meilleure (0,595) ([tableau A14](#a14)).
 
 **Signature de site et ComBat** : 20 caractéristiques de la substance blanche saine (FLAIR et T1), **classifieur de site** en validation croisée (5 plis), **ComBat** (neuroHarmonize) appris dans les plis d'entraînement, avec la charge lésionnelle et l'ICV comme covariables protégées.
 
-Le scanner est deviné à 90 % sans normalisation, 73 % après z-score et **28 % après ComBat** (hasard 20 %), et la variance due au site passe de 71 % à 2 % ([tableau A12](#a12)). La normalisation par image ne retire qu'une partie de l'empreinte du scanner ; ComBat l'efface presque entièrement, et le lien avec la biologie ressort même un peu mieux.
+Le scanner est deviné à 90 % sans normalisation, 73 % après z-score et **28 % après ComBat** (hasard 20 %), et la variance due au site passe de 71 % à 2 % ([tableau A15](#a15)). La normalisation par image ne retire qu'une partie de l'empreinte du scanner ; ComBat l'efface presque entièrement, et le lien avec la biologie ressort même un peu mieux.
 
 ### 7. Reproductibilité
 
@@ -360,18 +378,62 @@ Lecture : le **champ de biais** est détecté (60 % au niveau 2) avant que le Di
 | *O4 contre O3 (deux experts indépendants)* | *0,740* | *8,0* | | *0,763* |
 
 <a id="a10"></a>
-### A10. Accord du volume de HSB avec la référence O1 (Bland-Altman sur l'échelle logarithmique, ICC d'accord absolu)
+### A10. Biomarqueurs de la référence O1 par scanner (médianes, 170 sujets)
 
-| Volume de HSB contre O1 | Rapport moyen [limites d'accord 95 %] | ICC [IC 95 %] |
-|---|---|---|
-| **M1 nnU-Net** (test, 110) | **0,98** [0,62-1,55] | **0,982** [0,975-0,988] |
-| Expert O3 (entraînement, 60) | 0,97 [0,60-1,57] | 0,981 |
-| Expert O4 (entraînement, 60) | 0,91 [0,55-1,51] | 0,977 |
-| M3 seuillage | 1,18 [0,33-4,14] | 0,814 |
-| M2 WMH-SynthSeg | 2,44 [0,41-14,5] | 0,372 |
+| Scanner | Volume de HSB (ml) | % de l'ICV | Part périventriculaire | Lésions ≥ 10 mm³ | ICV (ml) |
+|---|---|---|---|---|---|
+| Utrecht Philips 3T | 13,9 | 0,92 | 0,80 | 47,5 | 1 517 |
+| Singapour Siemens 3T | 15,9 | 1,18 | 0,85 | 31,5 | 1 347 |
+| Amsterdam GE 3T | 6,3 | 0,44 | 0,87 | 36,5 | 1 465 |
+| Amsterdam Philips 3T | 7,6 | 0,57 | 0,84 | 54,0 | 1 445 |
+| Amsterdam GE 1,5T | 8,5 | 0,67 | 0,87 | 33,0 | 1 485 |
+| **Tous** | **11,2** (0,8 à 195) | | | | **1 450** (1 110 à 1 871) |
 
 <a id="a11"></a>
-### A11. Normalisation d'intensité : Dice du seuillage et effet du site (Kruskal-Wallis)
+### A11. Accord des biomarqueurs avec la référence O1 : rapport moyen [limites d'accord à 95 %] (Bland-Altman sur l'échelle logarithmique) et ICC d'accord absolu
+
+| Source (cas) | Volume total | Périventriculaire | Profond | Lésions ≥ 10 mm³ | Biais dépendant du site ? (Kruskal-Wallis, volume total) |
+|---|---|---|---|---|---|
+| **M1 nnU-Net** (test, 110) | **0,98** [0,62-1,55] ; ICC **0,982** [0,975-0,988] | 1,00 [0,64-1,56] ; 0,982 | 0,87 [0,37-2,04] ; 0,964 | 0,82 [0,56-1,21] ; 0,890 | oui (p < 0,001) |
+| M1 + DA5 (test, 110) | 0,90 [0,54-1,49] ; 0,976 | 0,92 [0,56-1,51] ; 0,976 | 0,83 [0,44-1,56] ; 0,975 | 0,79 [0,52-1,22] ; 0,857 | oui (p < 0,001) |
+| M3 seuillage (test, 110) | 1,18 [0,33-4,14] ; 0,814 | 1,21 [0,42-3,52] ; 0,852 | 0,93 [0,05-16,0] ; 0,543 | 0,55 [0,19-1,58] ; 0,305 | oui (p < 0,001) |
+| M2 WMH-SynthSeg (test, 110) | 2,44 [0,41-14,5] ; 0,372 | 2,53 [0,46-14,1] ; 0,349 | 2,23 [0,14-34,6] ; 0,436 | 0,44 [0,21-0,92] ; 0,300 | non (p = 0,10) |
+| Expert O3 (entraînement, 60) | 0,97 [0,60-1,57] ; 0,981 | 0,98 [0,60-1,62] ; 0,980 | 0,86 [0,43-1,73] ; 0,969 | 0,79 [0,51-1,22] ; 0,847 | oui (p < 0,001) |
+| Expert O4 (entraînement, 60) | 0,91 [0,55-1,51] ; 0,977 | 0,94 [0,55-1,61] ; 0,975 | 0,78 [0,39-1,56] ; 0,968 | 0,80 [0,54-1,19] ; 0,877 | oui (p < 0,001) |
+
+Rapport < 1 : la source mesure moins que O1. Les sujets sans lésion profonde (ou périventriculaire) sont exclus de ce biomarqueur ; le nombre de lésions est comparé en ln(x + 1).
+
+![Bland-Altman de M1 sur le test](results/figures/bland_altman_test_resencm.png)
+
+<a id="a12"></a>
+### A12. Biais du volume de HSB par scanner : rapport moyen à O1 [IC 95 % bootstrap] ; p de Wilcoxon contre 0 (p de Holm sur 116 tests)
+
+| Scanner | M1 nnU-Net (test) | M3 seuillage (test) | Expert O3 (entraînement) | Expert O4 (entraînement) |
+|---|---|---|---|---|
+| Utrecht Philips 3T | **0,87** [0,80-0,95] ; 0,001 (0,08) | **1,72** [1,31-2,26] ; < 0,001 (0,008) | 1,13 [1,04-1,25] ; 0,003 (0,23) | 0,96 [0,84-1,10] ; 0,08 (1) |
+| Singapour Siemens 3T | 1,03 [0,97-1,10] ; 0,11 (1) | 0,79 [0,65-0,98] ; 0,03 (1) | 0,90 [0,83-0,97] ; 0,007 (0,45) | **0,80** [0,76-0,85] ; < 0,001 (0,003) |
+| Amsterdam GE 3T | 1,01 [0,92-1,09] ; 0,05 (1) | 1,28 [1,11-1,48] ; 0,007 (0,43) | 0,89 [0,79-0,99] ; 0,07 (1) | 1,00 [0,91-1,09] ; 0,78 (1) |
+| Amsterdam Philips 3T (inconnu) | 0,98 [0,81-1,13] ; 0,49 (1) | 1,16 [0,90-1,54] ; 0,49 (1) | — | — |
+| Amsterdam GE 1,5T (inconnu) | **1,10** [1,06-1,14] ; 0,004 (0,27) | 0,96 [0,76-1,22] ; 0,92 (1) | — | — |
+
+Les experts n'ont annoté que les 3 scanners d'entraînement.
+
+<a id="a13"></a>
+### A13. Accord des cartes de fréquence lésionnelle (espace MNI, 2 mm) avec la carte de O1 : corrélation de Pearson voxel à voxel (110 cas de test)
+
+| Site | M1 nnU-Net | M3 seuillage | M2 WMH-SynthSeg |
+|---|---|---|---|
+| **Tous** | **0,995** | 0,903 | 0,879 |
+| Utrecht Philips 3T | 0,979 | 0,855 | 0,859 |
+| Singapour Siemens 3T | 0,992 | 0,886 | 0,881 |
+| Amsterdam GE 3T | 0,987 | 0,887 | 0,816 |
+| Amsterdam Philips 3T (inconnu) | 0,969 | 0,848 | 0,796 |
+| Amsterdam GE 1,5T (inconnu) | 0,970 | 0,887 | 0,669 |
+
+![Cartes de fréquence lésionnelle par méthode, moins O1](results/figures/mni_frequency_methods_minus_O1.png)
+
+<a id="a14"></a>
+### A14. Normalisation d'intensité : Dice du seuillage et effet du site (Kruskal-Wallis)
 
 | Normalisation de la FLAIR | Dice du seuillage | Effet du site sur le Dice (Kruskal-Wallis) |
 |---|---|---|
@@ -380,8 +442,8 @@ Lecture : le **champ de biais** est détecté (60 % au niveau 2) avant que le Di
 | WhiteStripe | 0,564 | aucun (p = 0,94) |
 | Appariement d'histogrammes | 0,522 | aucun (p = 0,52) |
 
-<a id="a12"></a>
-### A12. Signature de site des caractéristiques de la substance blanche saine, avant et après ComBat
+<a id="a15"></a>
+### A15. Signature de site des caractéristiques de la substance blanche saine, avant et après ComBat
 
 | Caractéristiques de la substance blanche saine | Scanner deviné (hasard 20 %) | Variance due au site | Lien avec la charge lésionnelle (\|ρ\|) |
 |---|---|---|---|
