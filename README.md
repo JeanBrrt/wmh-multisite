@@ -86,7 +86,7 @@ Les indicateurs de qualité (SNR, SNR de Dietrich, CNR, CJV, EFC, FBER, étendue
 
 Un z-score robuste est calculé **par scanner** pour chaque indicateur, avec la médiane et la MAD plutôt que la moyenne et l'écart type, sensibles aux anomalies. Le plus grand de ces z-scores donne un classement **utilisable / à vérifier / à exclure** (z ≥ 3 : à vérifier ; z ≥ 5 : à exclure, recommandation de contrôle visuel, jamais automatique). Une Isolation Forest signale en plus comme « à vérifier » les images dont la combinaison de z-scores est la plus atypique, même si aucun indicateur n'est extrême à lui seul.
 
-Résultat : **143 utilisables, 20 à vérifier, 7 à exclure**, répartis sur tous les scanners ([tableau A3](#a3)).
+**Résultat : ([tableau A3](#a3))**
 
 Sur les 110 cas de test (on ne peut pas faire cette analyse sur les cas d'entraînement, car le modèle M1 a appris dessus) on obtient 90 utilisables et 20 signalés (15 à vérifier, 5 à exclure). Les deux groupes ont un Dice comparable avec M1 (moyenne de 0,817 contre 0,799, médiane de 0,828 contre 0,823) et le test de Mann-Whitney pour des groupes indépendants donne p = 0,54. Le score d'anomalie continu que produit l'Isolation Forest n'a qu'une corrélation de Spearman faible avec le Dice (−0,19, p = 0,051, à la limite de la significativité).
 
@@ -94,15 +94,16 @@ Les images que le contrôle qualité a relevées comme les plus atypiques pour l
 
 ----------------------- 
 
-Nos données sont donc « propres ». Pour être sûr que notre contrôle qualité détecte des données réellement « sales », on crée un sous-ensemble de données artificiellement dégradées par des artefacts d'intensité croissante (via TorchIO : bruit, champ de biais, images fantômes, mouvement). On regarde ensuite la part des images détectées et l'effet des mêmes artefacts sur la segmentation par M1, ce qui compte ce sont les images **non détectées par notre contrôle qualité ET dont le Dice se dégrade**.
+Nos données sont donc « propres ». Pour être sûr que notre contrôle qualité détecte des données réellement « sales », on crée un sous-ensemble de données artificiellement dégradées par des artefacts d'intensité croissante (via TorchIO : bruit, champ de biais, images fantômes, mouvement). On regarde ensuite la part des images détectées et l'effet des mêmes artefacts sur la segmentation par M1, ce qui compte ce sont les images **non détectées par notre contrôle qualité ET dont la segmentation se dégrade**.
 
-Résultats ([tableau A4](#a4)) : aucune fausse alerte sur les images intactes, et un comportement très différent selon l'artefact.
-- **Champ de biais : détecté avant de nuire.** Le contrôle qualité le signale dès le niveau 2 (60 %, puis 100 %), alors que le Dice de M1 ne décroche qu'au niveau 3 (0,68, puis 0,44 au niveau 4).
-- **Bruit : détection partielle** (30 à 70 %), pour une dégradation progressive et modérée du Dice (0,78 à 0,70).
-- **Images fantômes : détectées trop tard.** Le Dice baisse aux niveaux 3 et 4 (0,73 puis 0,64), mais la détection n'atteint 60 % qu'au niveau 4.
-- **Mouvement : le vrai risque.** Il dégrade la segmentation dès le plus faible niveau (Dice 0,79 → 0,74, rappel lésionnel 0,72 → 0,53 : les petites lésions floutées disparaissent), et il n'est pas détecté en FLAIR. Il l'est en partie sur la T1 de la même séance (50 à 70 %), où les indicateurs de MRIQC, conçus pour la T1, sont plus sensibles.
+**Résultats ([tableau A4](#a4)) :**
 
-C'est la principale limite de notre contrôle qualité. Les indicateurs de MRIQC qui visent le flou et les artefacts dans l'air (FWHM, QI1), calculés sur l'image brute, n'ont pas été repris : ce sont les candidats naturels pour combler ce manque.
+- **Champ de biais :** Le contrôle qualité le signale dès le niveau 2 (60 %, puis 100 %) alors que la Dice de M1 ne décroche qu'au niveau 3 (0,68, puis 0,44 au niveau 4).
+- **Bruit :** détection partielle (30 à 70 %) pour une dégradation progressive et modérée du Dice (0,78 à 0,70).
+- **Images fantômes :** La Dice baisse aux niveaux 3 et 4 (0,73 puis 0,64) mais la détection n'atteint 60 % qu'au niveau 4.
+- **Mouvement :** Il dégrade la segmentation dès le plus faible niveau (Dice 0,79 → 0,74, rappel lésionnel 0,72 → 0,53 : les petites lésions floutées disparaissent) et il n'est pas détecté en FLAIR. Il l'est en partie sur la T1 de la même séance (50 à 70 %) où les indicateurs de MRIQC conçus pour la T1 sont plus sensibles.
+
+C'est la principale limite de notre contrôle qualité. Les indicateurs de MRIQC qui visent le flou et les artefacts dans l'air (FWHM, QI1) n'ont pas été repris pour simplifier ce projet. Le principal axe d'amélioration du contrôle qualité est donc l'implémentation de métriques plus spécifique au mouvement et images fantômes.
 
 ### 3. Segmentation
 
@@ -114,31 +115,34 @@ Trois méthodes sont comparées dans ce projet :
 | M2 | **WMH-SynthSeg** (FreeSurfer), modèle publié, utilisé sans modification (CPU, ~6 min et 26 à 30 Go de RAM par sujet) | Modèle généraliste prêt à l'emploi |
 | M3 | Seuillage de la FLAIR : z-score robuste dans le cerveau (seuil 2,2), profondeur minimale (14 mm du bord du cerveau) et taille minimale (40 mm³), réglés par recherche sur grille (1 674 combinaisons) sur l'entraînement | Référence classique |
 
-**Variantes testées** :
-- **M1 avec augmentation forte** (DA5, même budget) : aucun gain, y compris sur les scanners inconnus (Dice 0,798 contre 0,802, p Holm = 1) ;
-- **M1 sur le prétraitement des organisateurs** : même Dice (0,803), voir plus haut ;
+Avec quelques variantes :
+- **M1 avec augmentation forte** (DA5, même budget) : aucun gain y compris sur les scanners inconnus (Dice 0,798 contre 0,802, p Holm = 1) ;
+- **M1 sur le prétraitement des organisateurs** : même Dice (0,803) ;
 - **M3 par scanner** : le seuil optimal varie de 1,7 (Singapour) à 2,6 (Utrecht), signe de la dépendance d'une règle d'intensité au scanner ; il n'est donné qu'à titre d'information, un seul seuil global est utilisé ;
 - **M3 avec 4 normalisations d'intensité** : voir Harmonisation.
 
 ### 4. Évaluation
 
-Le script **officiel** du challenge (copié sans modification) produit les métriques suivantes : Dice, HD95, AVD, rappel lésionnel et F1 lésionnel. Les intervalles de confiance à 95 % sont produits par **bootstrap stratifié par scanner** (2 000 tirages), pour chaque métrique.
+**Protocole.** Toutes les méthodes sont évaluées sur les **110 cas de test**, jamais utilisés pour entraîner ni régler quoi que ce soit, contre la référence O1. On utilise le script **officiel** du challenge, copié sans modification, pour que les chiffres soient directement comparables au classement. Les zones « autre pathologie » (label 2) sont ignorées. Cinq métriques complémentaires sont calculées pour chaque sujet :
+- **Dice** : recouvrement des voxels ;
+- **HD95** : distance (mm) entre les contours au 95e centile, sensible aux erreurs éloignées ;
+- **AVD** : erreur relative sur le volume total ;
+- **rappel lésionnel** et **F1 lésionnel** : détection lésion par lésion (composantes connexes 3D), où chaque lésion compte pour 1 quelle que soit sa taille.
 
-**M1 : Dice 0,802 [0,784-0,820], 9e sur 58 au classement** ; M3 0,595 ; M2 0,402 ([tableau A5](#a5)). Le classement est recalculé avec la formule officielle, chaque méthode étant insérée parmi les 57 équipes publiées. M1 est **2e au Dice, 1er à l'AVD**, mais **22e au rappel** : son point faible est la détection des petites lésions.
+**Méthodes statistiques.**
+- **Incertitude** : intervalle de confiance à 95 % de chaque moyenne par **bootstrap percentile stratifié par scanner** (2 000 tirages avec remise, à l'intérieur de chaque scanner pour conserver la composition du test). Le Dice étant borné et asymétrique, aucune formule fermée ne convient.
+- **Comparaison de deux méthodes** : sur les mêmes sujets, donc **appariée**. Différence sujet par sujet, intervalle de confiance bootstrap de la différence moyenne, **test de Wilcoxon** signé (sans hypothèse de normalité), et **correction de Holm** sur les 140 tests (8 variantes évaluées, 28 paires, 5 métriques) pour contrôler les faux positifs dus à la multiplicité des tests.
+- **Scanners connus contre inconnus** : deux groupes de patients différents (90 et 20), donc **non appariés**. Différence des moyennes avec un bootstrap de chaque groupe et **test de Mann-Whitney**.
+- **Plafond humain** : les experts O3 et O4 sont notés contre O1 avec les mêmes métriques. Les 12 cas de validation du pli 0 sont les seuls où M1 (qui ne les a pas vus) et les experts sont jugés sur les mêmes images.
+- **Classement** : formule officielle du challenge (chaque métrique ramenée entre 0 pour la meilleure équipe et 1 pour la pire, puis moyenne des 5 rangs), chaque méthode étant insérée seule parmi les 57 équipes publiées.
 
-M1 varie de 0,776 (Amsterdam Philips, inconnu) à 0,834 (Singapour) ([tableau A6](#a6)).
-
-Une **comparaison appariée** (différence sujet par sujet) est également réalisée pour chaque paire de méthodes et chaque métrique, avec le test de **Wilcoxon** et la correction de **Holm** sur les 140 tests (8 méthodes évaluées, 28 paires, 5 métriques).
-
-M1 surpasse M3 et M2 sur les 5 métriques (p Holm < 1e-9) ; DA5 et le prétraitement des organisateurs ne changent rien (p Holm = 1) ([tableau A7](#a7)). M3 et M2 ne se dominent pas : M3 a le meilleur recouvrement et le meilleur volume, M2 trouve plus de lésions et fait des erreurs moins éloignées.
-
-**Scanners connus contre inconnus** (groupes de patients différents, donc test de **Mann-Whitney** et bootstrap de chaque groupe séparément ; [tableau A8](#a8)) : Dice 0,805 contre 0,790, différence −0,015 [−0,066 ; +0,030].
-
-Aucune dégradation démontrée, pour aucune méthode (avec Holm sur les 40 tests, plus petit p corrigé : 0,07). Avec 20 cas, les intervalles restent larges.
-
-**Plafond inter-observateurs** : les experts O3 et O4 sont notés contre O1 avec exactement les mêmes métriques. Les 12 cas de validation du pli 0 sont les seuls où M1 (qui ne les a pas vus) et les experts sont jugés sur les mêmes images.
-
-Sur ces 12 cas, M1 obtient un Dice de 0,815 contre 0,757 et 0,781 pour les experts O3 et O4 ([tableau A9](#a9)). Sur les 60 cas d'entraînement, O3 et O4 obtiennent 0,770 et 0,785 contre O1, et 0,759 entre eux. M1 est au niveau des experts ; il a appris le style de O1, contre lequel il est jugé, ce n'est donc pas « mieux qu'un expert ».
+**Résultats clés.**
+- **M1 atteint un Dice de 0,802 [0,784-0,820] et la 9e place sur 58** ([tableau A5](#a5)). Il est 2e au Dice et 1er à l'AVD, mais seulement 22e au rappel lésionnel (0,73) : son point faible est la détection des petites lésions. M3 (0,595) et M2 (0,402) sont 55e.
+- **M1 surpasse M3 et M2 sur les 5 métriques** (p Holm < 1e-9, [tableau A7](#a7)). M3 et M2 ne se dominent pas : M3 a le meilleur recouvrement et le meilleur volume, M2 trouve plus de lésions mais sur-segmente (AVD de 293 %).
+- **Ni l'augmentation forte (DA5) ni le prétraitement des organisateurs ne changent le résultat de M1** (différences de Dice de +0,005 et −0,001, p Holm = 1, [tableau A7](#a7)).
+- **M1 est stable d'un scanner à l'autre** : Dice de 0,776 (Amsterdam Philips) à 0,834 (Singapour) ([tableau A6](#a6)).
+- **Aucune dégradation démontrée sur les scanners inconnus** : Dice 0,790 contre 0,805, différence −0,015 [−0,066 ; +0,030], p = 0,45 ([tableau A8](#a8)). Il en va de même pour toutes les méthodes (plus petit p corrigé par Holm sur les 40 tests : 0,07). Avec 20 cas, l'intervalle reste large : une petite perte ne peut pas être exclue.
+- **M1 est au niveau des experts** : sur les 12 cas partagés, Dice de 0,815 contre 0,757 et 0,781 pour O3 et O4 ([tableau A9](#a9)), et deux experts indépendants ne s'accordent qu'à 0,74 à 0,76. Ce n'est pas « mieux qu'un expert » : M1 a appris le style de O1, contre lequel il est jugé.
 
 ### 5. Biomarqueurs
 
