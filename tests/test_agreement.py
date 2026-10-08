@@ -25,9 +25,21 @@ def test_icc_a1_hand_computation():
 def test_bland_altman():
     ba = bland_altman(np.array([0.0, 0.2, 0.4]))
     assert ba["bias"] == pytest.approx(0.2) and ba["sd"] == pytest.approx(0.2)
-    assert ba["loa_low"] == pytest.approx(0.2 - 1.96 * 0.2) and ba["loa_high"] == pytest.approx(
-        0.2 + 1.96 * 0.2
-    )
+    assert ba["loa_param_low"] == pytest.approx(0.2 - 1.96 * 0.2)
+    assert ba["loa_param_high"] == pytest.approx(0.2 + 1.96 * 0.2)
+    # empirical limits = 2.5th and 97.5th percentiles (linear interpolation)
+    assert ba["loa_low"] == pytest.approx(0.01) and ba["loa_high"] == pytest.approx(0.39)
+
+
+def test_empirical_limits_follow_a_skewed_distribution():
+    # mostly small errors and a tail of large underestimations (as M1): the parametric limits are
+    # pushed symmetrically outwards, the empirical ones stay where the data are
+    rng = np.random.default_rng(0)
+    d = np.concatenate([rng.normal(0.0, 0.05, 950), rng.normal(-1.0, 0.1, 50)])
+    ba = bland_altman(d)
+    assert ba["skewness"] < -2
+    assert ba["loa_high"] < ba["loa_param_high"]  # no long upper tail in the data
+    assert ba["loa_low"] < ba["loa_param_low"]  # the lower tail is longer than 1.96 SD
 
 
 def test_stratified_indices_keep_strata_sizes():
