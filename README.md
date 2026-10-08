@@ -391,7 +391,7 @@ Lecture : le **champ de biais** est détecté (60 % au niveau 2) avant que le Di
 <a id="a11"></a>
 ### A11. Accord des biomarqueurs avec la référence O1 (Bland-Altman sur l'échelle logarithmique, ICC d'accord absolu)
 
-Biais : moyenne des d = ln(source / O1), puis exponentielle (moyenne géométrique des rapports ; 0,98 = 2 % de moins que O1). Limites d'accord : 2,5e et 97,5e centiles des rapports individuels ; elles décrivent la dispersion des patients, ce ne sont **pas** des intervalles de confiance. Entre crochets : intervalle de confiance à 95 % de l'ICC (bootstrap stratifié par scanner). Les sujets sans lésion profonde (ou périventriculaire) sont exclus de ce biomarqueur ; le nombre de lésions est comparé en ln(x + 1).
+Biais : moyenne des d = ln(source / O1), puis exponentielle (moyenne géométrique des rapports ; 0,98 = 2 % de moins que O1). Limites d'accord : 2,5e et 97,5e centiles des rapports individuels ; elles décrivent la dispersion des patients, ce ne sont **pas** des intervalles de confiance. Entre crochets : intervalle de confiance à 95 % de l'ICC (bootstrap stratifié par scanner). Les sujets sans lésion profonde (ou périventriculaire) sont exclus de ce biomarqueur ; le nombre de lésions est comparé en ln(x + 1). Le % du volume intracrânien donne exactement le même accord que le volume total : pour un patient, la source et O1 sont divisées par le même ICV, donc leur rapport ne change pas.
 
 **Volume total**
 
@@ -432,18 +432,6 @@ Biais : moyenne des d = ln(source / O1), puis exponentielle (moyenne géométriq
 | M2 WMH-SynthSeg (test, 110) | 0,44 | 0,23 à 1,12 | 0,300 [0,236-0,361] | non (p = 0,58) |
 | Expert O3 (entraînement, 60) | 0,79 | 0,48 à 1,15 | 0,847 [0,773-0,898] | oui (p < 0,001) |
 | Expert O4 (entraînement, 60) | 0,80 | 0,51 à 1,15 | 0,877 [0,813-0,921] | non (p = 0,21) |
-
-Volume total : précision des limites d'accord (IC 95 % bootstrap stratifié par scanner) et écart à l'hypothèse de normalité de la formule classique.
-
-| Source | Limite basse [IC 95 %] | Limite haute [IC 95 %] | Formule classique (biais ± 1,96 écart type) | Asymétrie des d | Shapiro-Wilk p |
-|---|---|---|---|---|---|
-| **M1 nnU-Net** | 0,54 [0,45-0,65] | 1,31 [1,22-1,60] | [0,62 ; 1,55] | **−1,44** | < 0,001 |
-| M3 seuillage | 0,38 [0,29-0,49] | 6,14 [3,38-7,38] | [0,33 ; 4,14] | +0,65 | 0,005 |
-| M2 WMH-SynthSeg | 0,70 [0,40-0,97] | 16,3 [11,5-25,9] | [0,41 ; 14,5] | +0,50 | 0,001 |
-| Expert O3 | 0,61 [0,41-0,72] | 1,47 [1,28-2,01] | [0,60 ; 1,57] | −0,35 | 0,07 |
-| Expert O4 | 0,57 [0,41-0,70] | 1,61 [1,21-2,23] | [0,55 ; 1,51] | +0,36 | 0,004 |
-
-Pour M1, la formule classique placerait la limite haute à 1,55 alors qu'aucun patient ou presque ne dépasse 1,31 : les quelques fortes sous-estimations allongent l'écart type, que la formule répartit à tort des deux côtés.
 
 ![Bland-Altman de M1 sur le test](results/figures/bland_altman_test_resencm.png)
 
