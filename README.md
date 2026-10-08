@@ -70,8 +70,6 @@ DataverseNL ─> BIDS ─> recalage rigide T1→FLAIR ─> masque du cerveau (HD
 
 Les données sont téléchargées via l'API Dataverse et converties au format **BIDS 1.10**. Les organisateurs fournissent un prétraitement des images brutes basé sur un recalage **elastix** et une correction du champ de biais par **SPM12**. Le prétraitement est refait autrement ici : la T1 est recalée sur la FLAIR par un recalage rigide (**ANTs**, information mutuelle comme critère) et le champ de biais est corrigé par **N4**, estimé dans un masque du cerveau produit par **HD-BET** (sur GPU local).
 
-Contrôles : nos recalages contre ceux des organisateurs , et nos champs de biais contre ceux des organisateurs .
-
 Les deux recalages sont équivalents à une fraction de voxel près ([tableau A1](#a1)) (corrélation médiane 0,998, écart médian 0,14 mm). Nos champs de biais ressemblent à ceux de SPM12 ([tableau A2](#a2)) (corrélation 0,74 à 0,98). Notre prétraitement n'apporte pas de gain de performance ([tableau A5](#a5), [tableau A7](#a7)) mais plutôt de la traçabilité depuis les données brutes.
 
 Pour les cartes de groupe, chaque sujet est recalé sur le modèle **MNI152** par un recalage non linéaire **SyN**. La corrélation croisée remplace l'information mutuelle comme critère, elle est plus gourmande en calcul mais indispensable pour suivre les **ventricules dilatés** des sujets atrophiés. Le réglage par défaut ne les ramènait pas dans le contour du modèle (volume ventriculaire estimé 86 ml sur un sujet atrophié avec CC contre 26 ml avec le réglage par défaut). Le calcul sur le modèle à 2 mm divise le temps par 8 (6 min au lieu de 50 par sujet) pour une qualité presque identique.
@@ -80,21 +78,23 @@ Pour les cartes de groupe, chaque sujet est recalé sur le modèle **MNI152** pa
 
 Les indicateurs de qualité (SNR, SNR de Dietrich, CNR, CJV, EFC, FBER, étendue du champ de biais) sont calculés en se basant sur les définitions de **MRIQC**. Comme dans MRIQC, le bruit et le contraste sont mesurés sur l'image **corrigée par N4** (sur l'image brute, ils compteraient le biais une seconde fois), et le biais est mesuré à part, **sur le champ N4** lui-même. MRIQC ne prend pas en charge la FLAIR, et on réalise les adaptations suivantes par rapport à l'original :
 
-- La délimitation des régions anatomiques nécessaires au calcul des indicateurs de qualité est extraite de la segmentation de WMH-SynthSeg. La substance blanche est érodée d'un voxel sur son contour pour éviter l'effet de volume partiel ; les HSB en sont retirées, ainsi qu'une marge de 2 mm autour d'elles (la substance blanche qui borde une lésion est souvent déjà anormale, et faisait dépendre le SNR de la charge lésionnelle). Le masque de substance grise n'est composé que du cortex, trop fin (2 à 3 mm) pour être érodé comme la substance blanche.
-- Les calculs sont effectués sur l'intersection avec le masque du cerveau HD-BET. C'est avant tout une sécurité, puisque les régions de WMH-SynthSeg ne débordent quasiment pas de ce masque (sur 20 sujets : 0 % de la substance blanche et 0,3 % du cortex en médiane).
-- Le masque de l'air est le complément de la tête (seuil d'Otsu, plus grande composante, trous remplis, puis dilatation), en excluant les zéros exacts (remplissage hors du champ de vue ou défacement des sujets).
-- Le CJV et le rapport SB/SG ne sont jugés que sur la T1, car en FLAIR la substance blanche et la substance grise ont presque la même intensité (rapport de 0,87 à 0,99), ce qui ferait exploser le CJV sans rapport avec la qualité.
+- Les masques des régions anatomiques nécessaires au calcul des indicateurs de qualité sont extraite de la segmentation de WMH-SynthSeg. La substance blanche est érodée d'un voxel sur son contour pour éviter l'effet de volume partiel et les HSB en sont retirées, ainsi qu'une marge de 2 mm autour d'elles (la substance blanche qui borde une lésion est souvent déjà anormale, et faisait dépendre le SNR de la charge lésionnelle). Le masque de substance grise n'est composé que du cortex, trop fin (2 à 3 mm) pour être érodé comme la substance blanche.
+- Les calculs sont effectués sur l'intersection avec le masque du cerveau HD-BET. C'est avant tout une sécurité, puisque les régions de WMH-SynthSeg ne débordent quasiment pas de ce masque (sur 20 sujets : 0 % de la substance blanche et 0,3 % du cortex en médiane ne sont pas dans l'intersection du masque de cerveau).
+- Le masque de l'air est le complément de la tête (seuil d'Otsu, plus grande composante, trous remplis, puis dilatation), en excluant les zéros exacts (placés par le scanner ou par le défacement des sujets).
+- Le CJV et le rapport SB/SG ne sont jugés que sur la T1, parce que  en FLAIR la substance blanche et la substance grise ont presque la même intensité (rapport de 0,87 à 0,99), ce qui ferait exploser le CJV sans rapport avec la qualité.
 - La T1 est mesurée sur sa grille d'origine (le rééchantillonnage lisserait le bruit).
 
-Un z-score robuste est calculé **par scanner** pour chaque indicateur, avec la médiane et la MAD plutôt que la moyenne et l'écart type, sensibles aux anomalies (un z global ne ferait que détecter les scanners). Le plus grand de ces z-scores donne un classement **utilisable / à vérifier / à exclure** (z ≥ 3 : à vérifier ; z ≥ 5 : à exclure, recommandation de contrôle visuel, jamais automatique). Une Isolation Forest signale en plus, comme « à vérifier », les images dont la combinaison de z-scores est la plus atypique, même si aucun indicateur n'est extrême à lui seul.
+Un z-score robuste est calculé **par scanner** pour chaque indicateur, avec la médiane et la MAD plutôt que la moyenne et l'écart type, sensibles aux anomalies. Le plus grand de ces z-scores donne un classement **utilisable / à vérifier / à exclure** (z ≥ 3 : à vérifier ; z ≥ 5 : à exclure, recommandation de contrôle visuel, jamais automatique). Une Isolation Forest signale en plus comme « à vérifier » les images dont la combinaison de z-scores est la plus atypique, même si aucun indicateur n'est extrême à lui seul.
 
 Résultat : **143 utilisables, 20 à vérifier, 7 à exclure**, répartis sur tous les scanners ([tableau A3](#a3)).
 
-Sur les 110 cas de test (on ne peut pas faire cette analyse sur les cas d'entraînement, car le modèle M1 a appris dessus), on obtient 90 utilisables et 20 signalés (15 à vérifier, 5 à exclure). Les deux groupes ont un Dice comparable avec M1 (moyenne de 0,817 contre 0,799, médiane de 0,828 contre 0,823) ; le test de Mann-Whitney, pour des groupes indépendants, donne p = 0,54. Le score d'anomalie continu que produit l'Isolation Forest n'a qu'une corrélation de Spearman faible avec le Dice (−0,19, p = 0,051, à la limite de la significativité).
+Sur les 110 cas de test (on ne peut pas faire cette analyse sur les cas d'entraînement, car le modèle M1 a appris dessus) on obtient 90 utilisables et 20 signalés (15 à vérifier, 5 à exclure). Les deux groupes ont un Dice comparable avec M1 (moyenne de 0,817 contre 0,799, médiane de 0,828 contre 0,823) et le test de Mann-Whitney pour des groupes indépendants donne p = 0,54. Le score d'anomalie continu que produit l'Isolation Forest n'a qu'une corrélation de Spearman faible avec le Dice (−0,19, p = 0,051, à la limite de la significativité).
 
-Les images que le contrôle qualité a relevées comme les plus atypiques pour leur scanner ne sont donc pas pénalisées lors de la segmentation. Deux raisons principales : les organisateurs ont présélectionné des images de qualité, et nnU-Net (M1) encaisse bien ces variations. De plus, l'indicateur le plus souvent signalé par notre contrôle qualité est l'étendue du champ de biais, qui est justement corrigé par N4 avant la segmentation.
+Les images que le contrôle qualité a relevées comme les plus atypiques pour leur scanner ne sont donc pas pénalisées lors de la segmentation. Deux raisons principales : les organisateurs ont présélectionné des images de qualité, et nnU-Net (M1) encaisse bien ces variations. De plus, l'indicateur le plus souvent signalé par notre contrôle qualité est l'étendue du champ de biais qui est justement corrigé par N4 avant la segmentation.
 
-Nos données sont donc « propres ». Pour être sûr que notre contrôle qualité détecte des données réellement « sales », on crée un sous-ensemble de données artificiellement dégradées par des artefacts d'intensité croissante (via TorchIO : bruit, champ de biais, images fantômes, mouvement ; 10 images utilisables, 2 par scanner, 4 niveaux). On regarde ensuite la part des images détectées, et l'effet des mêmes artefacts sur la segmentation par M1. Ce qui compte, ce sont les images **non détectées par notre contrôle qualité ET dont le Dice se dégrade** : ne pas détecter un artefact qui n'a de toute façon pas d'influence sur la segmentation n'est pas grave.
+----------------------- 
+
+Nos données sont donc « propres ». Pour être sûr que notre contrôle qualité détecte des données réellement « sales », on crée un sous-ensemble de données artificiellement dégradées par des artefacts d'intensité croissante (via TorchIO : bruit, champ de biais, images fantômes, mouvement). On regarde ensuite la part des images détectées et l'effet des mêmes artefacts sur la segmentation par M1, ce qui compte ce sont les images **non détectées par notre contrôle qualité ET dont le Dice se dégrade**.
 
 Résultats ([tableau A4](#a4)) : aucune fausse alerte sur les images intactes, et un comportement très différent selon l'artefact.
 - **Champ de biais : détecté avant de nuire.** Le contrôle qualité le signale dès le niveau 2 (60 %, puis 100 %), alors que le Dice de M1 ne décroche qu'au niveau 3 (0,68, puis 0,44 au niveau 4).
@@ -276,14 +276,31 @@ Code sous licence MIT ([`LICENSE`](LICENSE)). Les données du challenge restent 
 | **Total** | **143** | **20** | **7** |
 
 <a id="a4"></a>
-### A4. Artefacts simulés : détection par le contrôle qualité et effet sur nnU-Net (10 sujets, niveaux 1 à 4 ; Dice sur l'image intacte 0,787)
+### A4. Artefacts simulés : détection par le contrôle qualité et effet sur nnU-Net, par artefact et par niveau
 
-| Artefact | Détecté en FLAIR (niveaux 1 → 4) | Détecté en T1 (niveaux 1 → 4) | Dice de nnU-Net (niveau 1 → 4) |
-|---|---|---|---|
-| Champ de biais | 0 → 100 % | 10 → 100 % | 0,780 → **0,442** : détecté **avant** de nuire |
-| Bruit | 30 → 70 % | 10 → 80 % | 0,781 → 0,699 |
-| Images fantômes | 20 → 60 % | 80 → 100 % | 0,784 → 0,637 |
-| **Mouvement** | **non concluant** | 50 → 70 % | **0,736** → 0,591 ; rappel lésionnel 0,72 → 0,53 dès le niveau 1 |
+Détection : part des 10 images classées « à vérifier » ou « à exclure » (2 par scanner, utilisables à l'origine ; seule la modalité indiquée est dégradée). Effet sur la segmentation : moyennes sur 10 autres cas de test utilisables (2 par scanner, dont 4 en commun), FLAIR dégradée, T1 intacte. Artefacts TorchIO, graine fixe.
+
+| Artefact | Niveau | Intensité | Détecté en FLAIR | Détecté en T1 | Dice de M1 | Rappel lésionnel de M1 | AVD de M1 (%) |
+|---|---|---|---|---|---|---|---|
+| Aucun (image intacte) | 0 | — | 0 % | 0 % | 0,787 | 0,72 | 14,8 |
+| **Champ de biais** (coefficients du polynôme) | 1 | 0,1 | 0 % | 10 % | 0,780 | 0,72 | 15,2 |
+| | 2 | 0,2 | **60 %** | 50 % | 0,761 | 0,63 | 21,1 |
+| | 3 | 0,35 | **100 %** | 100 % | 0,680 | 0,50 | 38,1 |
+| | 4 | 0,5 | 100 % | 100 % | **0,442** | 0,34 | 64,8 |
+| **Bruit** (écart type / médiane du cerveau) | 1 | 0,03 | 30 % | 10 % | 0,781 | 0,68 | 14,8 |
+| | 2 | 0,06 | 50 % | 40 % | 0,766 | 0,60 | 15,1 |
+| | 3 | 0,10 | 60 % | 40 % | 0,741 | 0,50 | 17,0 |
+| | 4 | 0,15 | 70 % | 80 % | 0,699 | 0,38 | 25,6 |
+| **Images fantômes** (intensité des fantômes) | 1 | 0,1 | 20 % | 80 % | 0,784 | 0,71 | 15,5 |
+| | 2 | 0,3 | 20 % | 60 % | 0,770 | 0,69 | 15,7 |
+| | 3 | 0,6 | 20 % | 60 % | 0,729 | 0,63 | 17,0 |
+| | 4 | 1,0 | 60 % | 100 % | 0,637 | 0,48 | 27,6 |
+| **Mouvement** (rotation max. en °, translation max. en mm) | 1 | 1 | 20 % | 50 % | **0,736** | **0,53** | 14,8 |
+| | 2 | 2 | 20 % | 50 % | 0,699 | 0,44 | 15,8 |
+| | 3 | 4 | 20 % | 70 % | 0,595 | 0,34 | 26,8 |
+| | 4 | 8 | 20 % | 70 % | 0,591 | 0,31 | 24,9 |
+
+Lecture : le **champ de biais** est détecté (60 % au niveau 2) avant que le Dice ne décroche (niveau 3). Le **bruit** et les **images fantômes** dégradent surtout le rappel lésionnel, avec une détection partielle ou tardive en FLAIR. Le **mouvement** dégrade le Dice et le rappel dès le niveau 1 alors que la détection en FLAIR reste à 20 % à tous les niveaux : les 2 mêmes sujets, déjà proches du seuil, sont signalés quel que soit le niveau (non concluant). Sur la T1, les indicateurs de MRIQC le détectent chez 50 à 70 % des sujets. Le volume (AVD) reste juste plus longtemps que le Dice : les artefacts effacent d'abord les petites lésions, qui pèsent peu dans le volume.
 
 <a id="a5"></a>
 ### A5. Métriques officielles sur les 110 cas de test (moyenne et IC à 95 %, bootstrap stratifié par scanner) et position au classement
