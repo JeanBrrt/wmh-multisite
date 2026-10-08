@@ -70,24 +70,9 @@ DataverseNL ─> BIDS ─> recalage rigide T1→FLAIR ─> masque du cerveau (HD
 
 Les données sont téléchargées via l'API Dataverse et converties au format **BIDS 1.10**. Les organisateurs fournissent un prétraitement des images brutes basé sur un recalage **elastix** et une correction du champ de biais par **SPM12**. Le prétraitement est refait autrement ici : la T1 est recalée sur la FLAIR par un recalage rigide (**ANTs**, information mutuelle comme critère) et le champ de biais est corrigé par **N4**, estimé dans un masque du cerveau produit par **HD-BET** (sur GPU local).
 
+Contrôles : recalage contre celui des organisateurs ([tableau A1](#a1)), champs de biais contre ceux de SPM12 ([tableau A2](#a2)).
 
-| | Corrélation avec elastix | Écart moyen (mm) | Écart maximal (mm) | Rotation relative (°) |
-|---|---|---|---|---|
-| Médiane | 0,998 | 0,14 | 0,29 | 0,11 |
-| Pire cas | 0,974 | 0,69 | 1,36 | 0,75 |
-| Médiane, Utrecht Philips 3T | 0,999 | 0,11 | 0,18 | 0,06 |
-| Médiane, Singapour Siemens 3T | 0,998 | 0,13 | 0,28 | 0,12 |
-| Médiane, Amsterdam GE 3T | 0,994 | 0,21 | 0,45 | 0,17 |
-| Médiane, Amsterdam Philips 3T | 0,994 | 0,22 | 0,51 | 0,20 |
-| Médiane, Amsterdam GE 1,5T | 0,988 | 0,46 | 0,84 | 0,35 |
-
-| Corrélation SPM12 (médiane, 60 sujets d'entraînement) | Amsterdam GE 3T | Singapour | Utrecht |
-|---|---|---|---|
-| FLAIR | 0,88 | 0,74 | 0,85 |
-| T1 | 0,94 | 0,97 | 0,98 |
-
-
-Les deux recalages sont équivalents à une fraction de voxel près, . Notre prétraitement n'apporte pas de gain de performance mais plutôt la traçabilité depuis les données brutes.
+Les deux recalages sont équivalents à une fraction de voxel près (corrélation médiane 0,998, écart médian 0,14 mm ; un seul sujet signalé, sub-146). Nos champs de biais ressemblent à ceux de SPM12 (corrélation 0,74 à 0,98) et donnent des images plus homogènes. Notre prétraitement n'apporte pas de gain de performance mais plutôt la traçabilité depuis les données brutes.
 
 Pour les cartes de groupe, chaque sujet est recalé sur le modèle **MNI152** par un recalage non linéaire **SyN**. La corrélation croisée (CC) remplace l'information mutuelle comme critère : elle est plus gourmande en calcul, mais indispensable pour suivre les **ventricules dilatés** des sujets atrophiés, que le réglage par défaut ne ramène pas dans le contour du modèle (sur un sujet atrophié : volume ventriculaire estimé 86 ml avec CC contre 26 ml avec le réglage par défaut). Le calcul sur le modèle à 2 mm divise le temps par 8 (6 min au lieu de 50 par sujet) pour une qualité presque identique (J-054).
 
@@ -101,27 +86,11 @@ Indicateurs de qualité calculés en se basant sur les définitions de **MRIQC**
 
 Un z-score robuste est calculé **par scanner**, avec la médiane et la MAD plutôt que la moyenne et l'écart type, sensibles aux anomalies (un z global ne ferait que détecter les scanners). Ce z-score, ainsi qu'une Isolation Forest, donnent un classement **utilisable / à vérifier / à exclure** (z ≥ 3 : à vérifier ; z ≥ 5 : à exclure, recommandation de contrôle visuel, jamais automatique).
 
-| Scanner | Utilisable | À vérifier | À exclure |
-|---|---|---|---|
-| Utrecht Philips 3T | 41 | 5 | 4 |
-| Singapour Siemens 3T | 42 | 7 | 1 |
-| Amsterdam GE 3T | 45 | 5 | 0 |
-| Amsterdam Philips 3T | 7 | 2 | 1 |
-| Amsterdam GE 1,5T | 8 | 1 | 1 |
-| **Total** | **143** | **20** | **7** |
+Résultat : **143 utilisables, 20 à vérifier, 7 à exclure**, répartis sur tous les scanners ([tableau A3](#a3)). Principaux motifs : champ de biais de la FLAIR (9 sujets), SNR de la FLAIR (7), FBER (4). **Aucun lien avec la qualité de segmentation** : sur le test, Dice de M1 0,817 pour les 20 sujets signalés contre 0,799 (p = 0,54) ; les images du challenge ont été sélectionnées et nnU-Net absorbe les variations présentes.
 
-Principaux motifs : champ de biais de la FLAIR (9 sujets), SNR de la FLAIR (7), FBER (4). **Aucun lien avec la qualité de segmentation** : sur le test, Dice de M1 0,817 pour les 20 sujets signalés contre 0,799 (p = 0,54) ; les images du challenge ont été sélectionnées et nnU-Net absorbe les variations présentes.
+**Validation sur des artefacts simulés** (TorchIO, 10 sujets utilisables, 4 niveaux croissants) : part des images détectées, et effet des mêmes artefacts sur la segmentation par nnU-Net (Dice sur l'image intacte : 0,787) : [tableau A4](#a4). Le champ de biais est détecté (100 % au niveau le plus fort) **avant** de nuire à la segmentation (Dice 0,780 puis 0,442).
 
-**Validation sur des artefacts simulés** (TorchIO, 10 sujets utilisables, 4 niveaux croissants) : part des images détectées, et effet des mêmes artefacts sur la segmentation par nnU-Net (Dice sur l'image intacte : 0,787).
-
-| Artefact | Détecté en FLAIR (niveaux 1 → 4) | Détecté en T1 (niveaux 1 → 4) | Dice de nnU-Net (niveau 1 → 4) |
-|---|---|---|---|
-| Champ de biais | 0 → 100 % | 10 → 100 % | 0,780 → **0,442** : détecté **avant** de nuire |
-| Bruit | 30 → 70 % | 10 → 80 % | 0,781 → 0,699 |
-| Images fantômes | 20 → 60 % | 80 → 100 % | 0,784 → 0,637 |
-| **Mouvement** | **non concluant** | 50 → 70 % | **0,736** → 0,591 ; rappel lésionnel 0,72 → 0,53 dès le niveau 1 |
-
-Aucune fausse alerte sur les images intactes. Le mouvement est le vrai risque : il efface les petites lésions dès le plus faible niveau et n'est pas détecté en FLAIR ; il l'est en partie sur la T1 de la même séance.
+Aucune fausse alerte sur les images intactes. Le mouvement est le vrai risque : il efface les petites lésions dès le plus faible niveau (rappel lésionnel 0,72 → 0,53) et n'est pas détecté en FLAIR ; il l'est en partie sur la T1 de la même séance.
 
 ### 3. Segmentation
 
@@ -143,70 +112,27 @@ Trois méthodes sont comparées dans ce projet :
 
 Le script **officiel** du challenge (copié sans modification) produit les métriques suivantes : Dice, HD95, AVD, rappel lésionnel et F1 lésionnel. Les intervalles de confiance à 95 % sont produits par **bootstrap stratifié par scanner** (2 000 tirages), pour chaque métrique.
 
-| Méthode (110 cas de test) | Dice ↑ | HD95 (mm) ↓ | AVD (%) ↓ | Rappel lésionnel ↑ | F1 lésionnel ↑ | Classement |
-|---|---|---|---|---|---|---|
-| **M1 nnU-Net** | **0,802** [0,784-0,820] | **6,1** [4,8-7,7] | **15,4** [13,1-18,0] | **0,728** [0,709-0,746] | 0,783 [0,768-0,798] | **9e / 58** |
-| M1 + augmentation forte (DA5) | 0,798 [0,779-0,815] | 6,3 [4,7-8,0] | 16,3 [14,1-18,9] | 0,727 [0,707-0,744] | **0,786** [0,769-0,801] | 10e / 58 |
-| M1 sur le prétraitement du challenge | 0,803 [0,783-0,821] | 6,4 [4,9-8,3] | 16,1 [13,3-19,0] | 0,724 [0,703-0,744] | 0,780 [0,762-0,796] | 10e / 58 |
-| M3 seuillage | 0,595 [0,558-0,628] | 22,7 [20,9-24,3] | 72,7 [53,0-95,9] | 0,229 [0,210-0,249] | 0,284 [0,267-0,300] | 55e / 58 |
-| M2 WMH-SynthSeg | 0,402 [0,361-0,442] | 14,0 [12,6-15,5] | 293 [210-389] | 0,428 [0,399-0,457] | 0,451 [0,432-0,471] | 55e / 58 |
+**M1 : Dice 0,802 [0,784-0,820], 9e sur 58 au classement** ; M3 0,595 ; M2 0,402 ([tableau A5](#a5)). Le classement est recalculé avec la formule officielle, chaque méthode étant insérée parmi les 57 équipes publiées. M1 est **2e au Dice, 1er à l'AVD**, mais **22e au rappel** : son point faible est la détection des petites lésions.
 
-Le classement est recalculé avec la formule officielle, chaque méthode étant insérée parmi les 57 équipes publiées. M1 est **2e au Dice, 1er à l'AVD**, mais **22e au rappel** : son point faible est la détection des petites lésions.
-
-| Dice par scanner | Utrecht | Singapour | Ams. GE 3T | Ams. Philips 3T (inconnu) | Ams. GE 1,5T (inconnu) |
-|---|---|---|---|---|---|
-| M1 nnU-Net | 0,786 | 0,834 | 0,796 | 0,776 | 0,804 |
-| M3 seuillage | 0,565 | 0,584 | 0,618 | 0,610 | 0,634 |
-| M2 WMH-SynthSeg | 0,413 | 0,495 | 0,333 | 0,392 | 0,309 |
-
-![Dice par méthode et par scanner](results/figures/dice_by_method_and_scanner.png)
+M1 varie de 0,776 (Amsterdam Philips, inconnu) à 0,834 (Singapour) ([tableau A6](#a6)).
 
 Une **comparaison appariée** (différence sujet par sujet) est également réalisée pour chaque paire de méthodes et chaque métrique, avec le test de **Wilcoxon** et la correction de **Holm** sur les 140 tests (8 méthodes évaluées, 28 paires, 5 métriques).
 
-| Comparaison (A − B) | Dice | HD95 (mm) | AVD (points) | Rappel | F1 |
-|---|---|---|---|---|---|
-| M1 − M3 | **+0,208** [0,186 ; 0,232] | **−16,6** | **−57** | **+0,50** | **+0,50** |
-| M1 − M2 | **+0,400** [0,372 ; 0,429] | **−7,9** | **−278** | **+0,30** | **+0,33** |
-| M3 − M2 | **+0,193** | +8,7 | **−221** | −0,20 | −0,17 |
-| M1 − DA5 | +0,005 (n.s.) | −0,1 (n.s.) | −0,9 (n.s.) | +0,002 (n.s.) | −0,003 (n.s.) |
-| M1 − M1 prétraitement challenge | −0,001 (n.s.) | −0,3 (n.s.) | −0,7 (n.s.) | +0,005 (n.s.) | +0,003 (n.s.) |
+M1 surpasse M3 et M2 sur les 5 métriques (p Holm < 1e-9) ; DA5 et le prétraitement des organisateurs ne changent rien (p Holm = 1) ([tableau A7](#a7)). M3 et M2 ne se dominent pas : M3 a le meilleur recouvrement et le meilleur volume, M2 trouve plus de lésions et fait des erreurs moins éloignées.
 
-Les trois premières lignes : toutes les différences sont significatives (p Holm < 1e-9) ; n.s. : p Holm = 1. M3 et M2 ne se dominent pas : M3 a le meilleur recouvrement et le meilleur volume, M2 trouve plus de lésions et fait des erreurs moins éloignées.
-
-**Scanners connus contre inconnus** (groupes de patients différents, donc test de **Mann-Whitney** et bootstrap de chaque groupe séparément) :
-
-| M1 nnU-Net | Connus (90) | Inconnus (20) | Inconnus − connus [IC 95 %] | p |
-|---|---|---|---|---|
-| Dice | 0,805 | 0,790 | −0,015 [−0,066 ; +0,030] | 0,45 |
-| HD95 (mm) | 5,6 | 8,5 | +2,9 [−2,2 ; +8,7] | 0,96 |
-| AVD (%) | 15,6 | 14,4 | −1,2 [−6,3 ; +4,3] | 0,94 |
-| Rappel lésionnel | 0,723 | 0,754 | +0,031 [−0,017 ; +0,077] | 0,17 |
+**Scanners connus contre inconnus** (groupes de patients différents, donc test de **Mann-Whitney** et bootstrap de chaque groupe séparément ; [tableau A8](#a8)) : Dice 0,805 contre 0,790, différence −0,015 [−0,066 ; +0,030].
 
 Aucune dégradation démontrée, pour aucune méthode (avec Holm sur les 40 tests, plus petit p corrigé : 0,07). Avec 20 cas, les intervalles restent larges.
 
 **Plafond inter-observateurs** : les experts O3 et O4 sont notés contre O1 avec exactement les mêmes métriques. Les 12 cas de validation du pli 0 sont les seuls où M1 (qui ne les a pas vus) et les experts sont jugés sur les mêmes images.
 
-| Contre la référence O1 (12 cas) | Dice | HD95 (mm) | Rappel | F1 |
-|---|---|---|---|---|
-| **M1 nnU-Net** | **0,815** | **4,3** | 0,686 | 0,762 |
-| Expert O3 | 0,757 | 5,7 | 0,641 | 0,721 |
-| Expert O4 | 0,781 | 4,9 | 0,686 | 0,760 |
-| *O4 contre O3 (deux experts indépendants)* | *0,740* | *8,0* | | *0,763* |
-
-Sur les 60 cas d'entraînement, O3 et O4 obtiennent 0,770 et 0,785 contre O1, et 0,759 entre eux. M1 est au niveau des experts ; il a appris le style de O1, contre lequel il est jugé, ce n'est donc pas « mieux qu'un expert ».
+Sur ces 12 cas, M1 obtient un Dice de 0,815 contre 0,757 et 0,781 pour les experts O3 et O4 ([tableau A9](#a9)). Sur les 60 cas d'entraînement, O3 et O4 obtiennent 0,770 et 0,785 contre O1, et 0,759 entre eux. M1 est au niveau des experts ; il a appris le style de O1, contre lequel il est jugé, ce n'est donc pas « mieux qu'un expert ».
 
 ### 5. Biomarqueurs
 
 Volume de HSB (ml et % du volume intracrânien), découpe **périventriculaire / profonde** (règle des 10 mm autour des ventricules segmentés par WMH-SynthSeg), nombre et taille des lésions, **cartes de fréquence lésionnelle dans l'espace MNI** par site. Accord avec la référence : **Bland-Altman** sur l'échelle logarithmique (les erreurs croissent avec le volume), **ICC** d'accord absolu, biais par site.
 
-| Volume de HSB contre O1 | Rapport moyen [limites d'accord 95 %] | ICC [IC 95 %] |
-|---|---|---|
-| **M1 nnU-Net** (test, 110) | **0,98** [0,62-1,55] | **0,982** [0,975-0,988] |
-| Expert O3 (entraînement, 60) | 0,97 [0,60-1,57] | 0,981 |
-| Expert O4 (entraînement, 60) | 0,91 [0,55-1,51] | 0,977 |
-| M3 seuillage | 1,18 [0,33-4,14] | 0,814 |
-| M2 WMH-SynthSeg | 2,44 [0,41-14,5] | 0,372 |
-
+- Volume de HSB : **ICC 0,982 pour M1, au niveau des experts O3 et O4 (0,981 et 0,977)** ; M3 0,814, M2 0,372 ([tableau A10](#a10)).
 - Charge médiane (O1) de 0,44 % (Amsterdam GE 3T) à 1,18 % (Singapour) du volume intracrânien.
 - Lésions **profondes** moins bien mesurées que périventriculaires (M1 : rapport 0,87 [0,37-2,04], ICC 0,964, contre 1,00 [0,64-1,56], ICC 0,982).
 - Le biais dépend du site pour toutes les sources, **experts compris** (Kruskal-Wallis p < 0,001) : M1 sous-estime à Utrecht (0,87), mais l'expert O4 aussi à Singapour (0,80). Une partie du « biais de site » reflète le style de la référence.
@@ -214,24 +140,11 @@ Volume de HSB (ml et % du volume intracrânien), découpe **périventriculaire /
 
 ### 6. Harmonisation
 
-**Normalisation d'intensité**, testée par son effet sur le seuillage, site par site :
-
-| Normalisation de la FLAIR | Dice du seuillage | Effet du site sur le Dice (Kruskal-Wallis) |
-|---|---|---|
-| Aucune | 0,203 | fort (p < 0,001) ; Dice 0,00 sur 2 scanners |
-| **z-score robuste** | **0,595** | aucun (p = 0,90) |
-| WhiteStripe | 0,564 | aucun (p = 0,94) |
-| Appariement d'histogrammes | 0,522 | aucun (p = 0,52) |
+**Normalisation d'intensité**, testée par son effet sur le seuillage, site par site : sans normalisation, le seuillage s'effondre (Dice 0,203, 0,00 sur 2 scanners) ; les trois normalisations par image suppriment l'effet du site, et la plus simple, le z-score robuste, est la meilleure (0,595) ([tableau A11](#a11)).
 
 **Signature de site et ComBat** : 20 caractéristiques de la substance blanche saine (FLAIR et T1), **classifieur de site** en validation croisée (5 plis), **ComBat** (neuroHarmonize) appris dans les plis d'entraînement, avec la charge lésionnelle et l'ICV comme covariables protégées.
 
-| Caractéristiques de la substance blanche saine | Scanner deviné (hasard 20 %) | Variance due au site | Lien avec la charge lésionnelle (\|ρ\|) |
-|---|---|---|---|
-| Sans normalisation | 90 % | 71 % | 0,24 |
-| z-score robuste | 73 % | 21 % | 0,40 |
-| z-score + **ComBat** | **28 %** | **2 %** | **0,44** |
-
-La normalisation par image ne retire qu'une partie de l'empreinte du scanner ; ComBat l'efface presque entièrement, et le lien avec la biologie ressort même un peu mieux.
+Le scanner est deviné à 90 % sans normalisation, 73 % après z-score et **28 % après ComBat** (hasard 20 %), et la variance due au site passe de 71 % à 2 % ([tableau A12](#a12)). La normalisation par image ne retire qu'une partie de l'empreinte du scanner ; ComBat l'efface presque entièrement, et le lien avec la biologie ressort même un peu mieux.
 
 ### 7. Reproductibilité
 
@@ -312,3 +225,133 @@ justification.md            journal des décisions (J-001 à J-065)
 ## Licence
 
 Code sous licence MIT ([`LICENSE`](LICENSE)). Les données du challenge restent sous licence CC BY-NC 4.0 et ne sont pas redistribuées.
+
+---
+
+## Annexes : tableaux de résultats
+
+<a id="a1"></a>
+### A1. Recalage rigide ANTs contre elastix (169 sujets recalés par ANTs ; sub-146 utilise la transformation d'elastix, J-039)
+
+| | Corrélation avec elastix | Écart moyen (mm) | Écart maximal (mm) | Rotation relative (°) |
+|---|---|---|---|---|
+| Médiane | 0,998 | 0,14 | 0,29 | 0,11 |
+| Pire cas | 0,974 | 0,69 | 1,36 | 0,75 |
+| Médiane, Utrecht Philips 3T | 0,999 | 0,11 | 0,18 | 0,06 |
+| Médiane, Singapour Siemens 3T | 0,998 | 0,13 | 0,28 | 0,12 |
+| Médiane, Amsterdam GE 3T | 0,994 | 0,21 | 0,45 | 0,17 |
+| Médiane, Amsterdam Philips 3T | 0,994 | 0,22 | 0,51 | 0,20 |
+| Médiane, Amsterdam GE 1,5T | 0,988 | 0,46 | 0,84 | 0,35 |
+
+<a id="a2"></a>
+### A2. Corrélation des champs de biais N4 / SPM12 (médiane, 60 sujets d'entraînement)
+
+| Corrélation SPM12 (médiane, 60 sujets d'entraînement) | Amsterdam GE 3T | Singapour | Utrecht |
+|---|---|---|---|
+| FLAIR | 0,88 | 0,74 | 0,85 |
+| T1 | 0,94 | 0,97 | 0,98 |
+
+<a id="a3"></a>
+### A3. Classement du contrôle qualité par scanner (170 sujets)
+
+| Scanner | Utilisable | À vérifier | À exclure |
+|---|---|---|---|
+| Utrecht Philips 3T | 41 | 5 | 4 |
+| Singapour Siemens 3T | 42 | 7 | 1 |
+| Amsterdam GE 3T | 45 | 5 | 0 |
+| Amsterdam Philips 3T | 7 | 2 | 1 |
+| Amsterdam GE 1,5T | 8 | 1 | 1 |
+| **Total** | **143** | **20** | **7** |
+
+<a id="a4"></a>
+### A4. Artefacts simulés : détection par le contrôle qualité et effet sur nnU-Net (10 sujets, niveaux 1 à 4 ; Dice sur l'image intacte 0,787)
+
+| Artefact | Détecté en FLAIR (niveaux 1 → 4) | Détecté en T1 (niveaux 1 → 4) | Dice de nnU-Net (niveau 1 → 4) |
+|---|---|---|---|
+| Champ de biais | 0 → 100 % | 10 → 100 % | 0,780 → **0,442** : détecté **avant** de nuire |
+| Bruit | 30 → 70 % | 10 → 80 % | 0,781 → 0,699 |
+| Images fantômes | 20 → 60 % | 80 → 100 % | 0,784 → 0,637 |
+| **Mouvement** | **non concluant** | 50 → 70 % | **0,736** → 0,591 ; rappel lésionnel 0,72 → 0,53 dès le niveau 1 |
+
+<a id="a5"></a>
+### A5. Métriques officielles sur les 110 cas de test (moyenne et IC à 95 %, bootstrap stratifié par scanner) et position au classement
+
+| Méthode (110 cas de test) | Dice ↑ | HD95 (mm) ↓ | AVD (%) ↓ | Rappel lésionnel ↑ | F1 lésionnel ↑ | Classement |
+|---|---|---|---|---|---|---|
+| **M1 nnU-Net** | **0,802** [0,784-0,820] | **6,1** [4,8-7,7] | **15,4** [13,1-18,0] | **0,728** [0,709-0,746] | 0,783 [0,768-0,798] | **9e / 58** |
+| M1 + augmentation forte (DA5) | 0,798 [0,779-0,815] | 6,3 [4,7-8,0] | 16,3 [14,1-18,9] | 0,727 [0,707-0,744] | **0,786** [0,769-0,801] | 10e / 58 |
+| M1 sur le prétraitement du challenge | 0,803 [0,783-0,821] | 6,4 [4,9-8,3] | 16,1 [13,3-19,0] | 0,724 [0,703-0,744] | 0,780 [0,762-0,796] | 10e / 58 |
+| M3 seuillage | 0,595 [0,558-0,628] | 22,7 [20,9-24,3] | 72,7 [53,0-95,9] | 0,229 [0,210-0,249] | 0,284 [0,267-0,300] | 55e / 58 |
+| M2 WMH-SynthSeg | 0,402 [0,361-0,442] | 14,0 [12,6-15,5] | 293 [210-389] | 0,428 [0,399-0,457] | 0,451 [0,432-0,471] | 55e / 58 |
+
+<a id="a6"></a>
+### A6. Dice par scanner
+
+| Dice par scanner | Utrecht | Singapour | Ams. GE 3T | Ams. Philips 3T (inconnu) | Ams. GE 1,5T (inconnu) |
+|---|---|---|---|---|---|
+| M1 nnU-Net | 0,786 | 0,834 | 0,796 | 0,776 | 0,804 |
+| M3 seuillage | 0,565 | 0,584 | 0,618 | 0,610 | 0,634 |
+| M2 WMH-SynthSeg | 0,413 | 0,495 | 0,333 | 0,392 | 0,309 |
+
+![Dice par méthode et par scanner](results/figures/dice_by_method_and_scanner.png)
+
+<a id="a7"></a>
+### A7. Comparaisons appariées (différence moyenne A − B, Wilcoxon, Holm sur 140 tests ; en gras : p Holm < 1e-9 ; n.s. : p Holm = 1)
+
+| Comparaison (A − B) | Dice | HD95 (mm) | AVD (points) | Rappel | F1 |
+|---|---|---|---|---|---|
+| M1 − M3 | **+0,208** [0,186 ; 0,232] | **−16,6** | **−57** | **+0,50** | **+0,50** |
+| M1 − M2 | **+0,400** [0,372 ; 0,429] | **−7,9** | **−278** | **+0,30** | **+0,33** |
+| M3 − M2 | **+0,193** | +8,7 | **−221** | −0,20 | −0,17 |
+| M1 − DA5 | +0,005 (n.s.) | −0,1 (n.s.) | −0,9 (n.s.) | +0,002 (n.s.) | −0,003 (n.s.) |
+| M1 − M1 prétraitement challenge | −0,001 (n.s.) | −0,3 (n.s.) | −0,7 (n.s.) | +0,005 (n.s.) | +0,003 (n.s.) |
+
+<a id="a8"></a>
+### A8. Scanners connus contre inconnus, M1 nnU-Net (Mann-Whitney)
+
+| M1 nnU-Net | Connus (90) | Inconnus (20) | Inconnus − connus [IC 95 %] | p |
+|---|---|---|---|---|
+| Dice | 0,805 | 0,790 | −0,015 [−0,066 ; +0,030] | 0,45 |
+| HD95 (mm) | 5,6 | 8,5 | +2,9 [−2,2 ; +8,7] | 0,96 |
+| AVD (%) | 15,6 | 14,4 | −1,2 [−6,3 ; +4,3] | 0,94 |
+| Rappel lésionnel | 0,723 | 0,754 | +0,031 [−0,017 ; +0,077] | 0,17 |
+
+<a id="a9"></a>
+### A9. Plafond inter-observateurs (12 cas de validation du pli 0, non vus par M1)
+
+| Contre la référence O1 (12 cas) | Dice | HD95 (mm) | Rappel | F1 |
+|---|---|---|---|---|
+| **M1 nnU-Net** | **0,815** | **4,3** | 0,686 | 0,762 |
+| Expert O3 | 0,757 | 5,7 | 0,641 | 0,721 |
+| Expert O4 | 0,781 | 4,9 | 0,686 | 0,760 |
+| *O4 contre O3 (deux experts indépendants)* | *0,740* | *8,0* | | *0,763* |
+
+<a id="a10"></a>
+### A10. Accord du volume de HSB avec la référence O1 (Bland-Altman sur l'échelle logarithmique, ICC d'accord absolu)
+
+| Volume de HSB contre O1 | Rapport moyen [limites d'accord 95 %] | ICC [IC 95 %] |
+|---|---|---|
+| **M1 nnU-Net** (test, 110) | **0,98** [0,62-1,55] | **0,982** [0,975-0,988] |
+| Expert O3 (entraînement, 60) | 0,97 [0,60-1,57] | 0,981 |
+| Expert O4 (entraînement, 60) | 0,91 [0,55-1,51] | 0,977 |
+| M3 seuillage | 1,18 [0,33-4,14] | 0,814 |
+| M2 WMH-SynthSeg | 2,44 [0,41-14,5] | 0,372 |
+
+<a id="a11"></a>
+### A11. Normalisation d'intensité : Dice du seuillage et effet du site (Kruskal-Wallis)
+
+| Normalisation de la FLAIR | Dice du seuillage | Effet du site sur le Dice (Kruskal-Wallis) |
+|---|---|---|
+| Aucune | 0,203 | fort (p < 0,001) ; Dice 0,00 sur 2 scanners |
+| **z-score robuste** | **0,595** | aucun (p = 0,90) |
+| WhiteStripe | 0,564 | aucun (p = 0,94) |
+| Appariement d'histogrammes | 0,522 | aucun (p = 0,52) |
+
+<a id="a12"></a>
+### A12. Signature de site des caractéristiques de la substance blanche saine, avant et après ComBat
+
+| Caractéristiques de la substance blanche saine | Scanner deviné (hasard 20 %) | Variance due au site | Lien avec la charge lésionnelle (\|ρ\|) |
+|---|---|---|---|
+| Sans normalisation | 90 % | 71 % | 0,24 |
+| z-score robuste | 73 % | 21 % | 0,40 |
+| z-score + **ComBat** | **28 %** | **2 %** | **0,44** |
