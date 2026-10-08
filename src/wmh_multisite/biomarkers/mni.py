@@ -16,7 +16,9 @@ Two resamplings in a row instead of one composed transform: each step reuses a c
 checked in the project (``qc.iqm.labels_to_t1`` for the inverse rigid, notebook 06 for [warp, affine]),
 at the cost of a little extra smoothing, harmless for a frequency map.
 
-Sources: O1 for the 170 subjects (training and test); the models on the 110 test subjects.
+Sources: O1 for the 170 subjects (training and test); the models on the 110 test subjects; the experts
+O3 and O4 on the 60 training subjects (human reference for the map agreement, compared with the O1 map
+of the same 60 subjects).
 
 Usage:
     uv run python -m wmh_multisite.biomarkers.mni
@@ -117,12 +119,12 @@ def subject_maps(task: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def frequency_maps(cfg: dict[str, Any], table: pd.DataFrame) -> dict[tuple[str, str, str], np.ndarray]:
-    """(source, split group, site) -> mean fraction map. Split group: 'all' (O1, 170) or 'test'."""
+    """(source, split group, site) -> mean fraction map. Split group: 'training', 'test', or 'all' (O1)."""
     import nibabel as nib
 
     maps = {}
     for source, g in table.groupby("source"):
-        groups = {"test": g[g.split == "test"]}
+        groups = {split: g[g.split == split] for split in sorted(g.split.unique())}
         if source == "O1":
             groups["all"] = g
         for split_group, gs in groups.items():
@@ -136,15 +138,16 @@ def frequency_maps(cfg: dict[str, Any], table: pd.DataFrame) -> dict[tuple[str, 
 
 
 def map_agreement(maps: dict, brain: np.ndarray) -> pd.DataFrame:
-    """Voxel-wise Pearson correlation of each method's test map with the O1 test map, per site."""
+    """Voxel-wise Pearson correlation of each source's map with the O1 map of the same subjects, per site."""
     rows = []
     for (source, split_group, site), m in maps.items():
-        if source == "O1" or split_group != "test":
+        if source == "O1" or split_group == "all":
             continue
-        ref = maps[("O1", "test", site)]
+        ref = maps[("O1", split_group, site)]
         rows.append(
             {
                 "source": source,
+                "split": split_group,
                 "site": site,
                 "pearson_r_vs_O1": float(np.corrcoef(m[brain], ref[brain])[0, 1]),
                 "mean_freq": float(m[brain].mean()),
@@ -210,6 +213,8 @@ def main(argv: list[str] | None = None) -> None:
         sources = {"O1": manual(cfg, sub, "O1")}
         if row.split == "test":
             sources |= {s: prediction(cfg, sub, s) for s in m["models"] if prediction(cfg, sub, s).is_file()}
+        else:  # experts of the training set (human reference)
+            sources |= {o: manual(cfg, sub, o) for o in ("O3", "O4") if manual(cfg, sub, o).is_file()}
         tasks.append(
             {
                 "sub": sub,

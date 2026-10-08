@@ -795,6 +795,15 @@ Un seul triplet (t, e, m) pour tous les scanners, choisi par recherche sur grill
 **Décision.** `biomarkers/agreement.py` : limites d'accord **empiriques** (2,5e et 97,5e centiles des d), les limites non paramétriques recommandées par Bland et Altman (1999) quand les différences ne sont pas normales, avec leur **IC à 95 % par bootstrap stratifié par scanner** (mêmes tirages que l'IC de l'ICC). Les limites paramétriques, l'asymétrie et le p de Shapiro-Wilk restent dans le tableau, pour comparaison. Figure : limites empiriques en tirets, paramétriques en pointillés. Test sur une distribution asymétrique simulée.
 **Résultats (volume total).** M1 : [0,62 ; 1,55] devient **[0,54 ; 1,31]** (limite basse [0,45-0,65], haute [1,22-1,60]) ; O3 [0,62 ; 1,47] ; O4 [0,57 ; 1,61] ; M3 [0,38 ; 6,14] ; M2 [0,70 ; 16,3]. Biais, ICC et biais par site inchangés.
 **Lecture.** La conclusion tient : M1 reste dans la plage des experts. Elle se précise : son erreur est asymétrique, il surestime rarement de plus de 30 % mais sous-estime fortement quelques patients (jusqu'à −46 %), ceux où il manque beaucoup de petites lésions (cohérent avec son rappel lésionnel, J-042).
+
+---
+
+## J-067 — Cartes MNI : référence humaine (experts O3 et O4)
+2026-10-08 · Actée
+
+**Question (rédaction du README).** La corrélation de la carte de M1 avec celle de O1 (0,995) n'avait pas de point de comparaison humain. `biomarkers/mni.py` transporte désormais aussi les délimitations de O3 et O4 (60 cas d'entraînement) dans l'espace MNI, et chaque carte est comparée à celle de O1 **sur les mêmes sujets** (colonne `split` ajoutée à `mni_map_agreement.csv`). Chiffres des méthodes inchangés.
+**Résultats.** O3 0,993, O4 0,992 (par site : 0,972 à 0,987), contre M1 0,995 sur le test (0,969 à 0,992). **M1 place les lésions comme un second expert.**
+**Limite.** Sujets différents (test contre entraînement) et nombre différent (60 contre 110 ; 20 contre 30 par site) : une carte faite sur moins de sujets est plus bruitée, ce qui baisse mécaniquement la corrélation. Comparaison indicative.
 ---
 
 ## Décisions en attente
