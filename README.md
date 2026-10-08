@@ -12,8 +12,6 @@ Ce projet s'articule autour de quatre questions :
 > (1) repérer les images problématiques, (2) segmenter les lésions de façon fiable, y compris sur un scanner jamais vu,
 > (3) en tirer des biomarqueurs comparables d'un site à l'autre, et (4) retirer l'empreinte du scanner sans effacer la biologie ?
 
-Chaque choix est justifié, avec ses alternatives et ses preuves, dans le journal de décisions [`justification.md`](justification.md) (J-001 à J-067). L'avancement est suivi dans [`ROADMAP.md`](ROADMAP.md).
-
 ---
 
 ## Résultats en bref
@@ -47,24 +45,6 @@ Chaque choix est justifié, avec ses alternatives et ses preuves, dans le journa
 Les organisateurs fournissent toutes les FLAIR **reconstruites en coupes axiales de 3 mm** (grilles de 128 × 256 × 103 à 321 × 240 × 83 voxels selon le scanner), et défacées pour Amsterdam seulement. La FLAIR est l'image de référence : la vérité terrain et l'évaluation sont dans sa grille.
 
 ---
-
-## La chaîne de traitement
-
-```
-DataverseNL ─> BIDS ─> recalage rigide T1→FLAIR ─> masque du cerveau (HD-BET) ─> correction de biais N4
-                                                                                        │
-         ┌──────────────────────────────────────────────────────────────────────────────┤
-         v                                    v                                          v
-  contrôle qualité               segmentation : M1 nnU-Net,                   normalisation d'intensité
-  (indicateurs MRIQC,            M2 WMH-SynthSeg, M3 seuillage                (z-score, WhiteStripe,
-   atypiques par site)                       │                                 appariement d'histogrammes)
-                                             v                                          │
-                              évaluation officielle + statistiques                      v
-                                             │                               signature de site, ComBat
-                                             v
-                          biomarqueurs (volume / ICV, périventriculaire / profond,
-                          nombre de lésions, cartes MNI), accord par site
-```
 
 ### 1. Données et prétraitement
 
@@ -160,7 +140,7 @@ On calcule les biomarqueurs suivant pour chaque sujet et chaque source de segmen
 **Méthodes statistiques.**
 - **Bland-Altman**: le **biais** (moyenne des d ramenée en rapport par une exponentielle) dit si la source mesure trop ou trop peu en moyenne et les **limites d'accord** encadrent l'erreur sur 95 % des patients pris un par un. La formule classique (biais ± 1,96 écart type) suppose que les d suivent une loi normale, donc symétrique. Ce n'est pas le cas ici : pour M1, les erreurs ont une longue queue du côté des sous-estimations (asymétrie −1,4 ; normalité rejetée par le test de Shapiro-Wilk, p < 0,001). On lit donc directement les limites dans les données : les **2,5e et 97,5e centiles des d** (limites « empiriques »).
 - **ICC d'accord absolu** (ICC(A,1), McGraw et Wong) : sur le logarithme des volumes, avec un IC bootstrap stratifié par scanner : la part de la variabilité due aux vraies différences entre patients plutôt qu'aux erreurs de mesure (1 = accord parfait). Contrairement à une corrélation il pénalise un écart systématique (une méthode qui doublerait tous les volumes aurait une corrélation de 1).
-- **Biais par site** : **sur chaque scanner**, le biais avec son IC bootstrap et un test de Wilcoxon contre 0 (le biais de ce scanner est-il différent de zéro ?), corrigé par Holm sur les 116 tests ([tableau D3](#d3)) ; **entre les scanners**, un test de Kruskal-Wallis par source, qui compare les erreurs des 5 scanners entre elles ([tableau D2](#d2), dernière colonne).
+- **Biais par site** : **sur chaque scanner**, le biais avec son IC bootstrap et un test de Wilcoxon contre 0 (le biais de ce scanner est-il différent de zéro ?), corrigé par Holm sur les 116 tests ([tableau D3](#d3)) ; **entre les scanners**, un test de Kruskal-Wallis par source, qui compare les erreurs des 5 scanners entre elles   ([tableau D2](#d2), dernière colonne).
 - **Cartes MNI** : chaque masque est transporté dans l'espace commun (FLAIR → T1 → MNI), puis on calcule la proportion de sujets ayant une lésion en chaque voxel. L'accord avec O1 est la **corrélation de Pearson voxel à voxel** entre les cartes (même motif spatial = 1), complétée par des cartes de différence qui montrent où se situent les écarts.
 
 **Résultats clés.**
@@ -233,7 +213,6 @@ notebooks/                  explorations et contrôles visuels (sorties retirée
 containers/, hpc/           Docker, Apptainer, SLURM
 tests/                      155 tests
 results/tables, figures     résultats agrégés (aucune image de patient)
-justification.md            journal des décisions (J-001 à J-067)
 ```
 
 ## Limites
