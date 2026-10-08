@@ -767,6 +767,15 @@ Un seul triplet (t, e, m) pour tous les scanners, choisi par recherche sur grill
 | Images fantômes | 0,2 / 0,2 / 0,2 / 0,6 | **0,8 / 0,6 / 0,6 / 1** |
 | **Mouvement** | 0,2 / 0,2 / 0,2 / 0,2 (non concluant) | **0,5 / 0,5 / 0,7 / 0,7** |
 **Lecture.** Les indicateurs de MRIQC, conçus pour la T1, y sont plus sensibles : le **mouvement**, que le QC ne détecte pas en FLAIR, est détecté sur la T1 chez la moitié des sujets dès le niveau 1, et de plus en plus avec le niveau (indicateurs en cause : CJV, SNR de Dietrich, champ de biais). Réserves : 10 sujets ; 5 sujets détectés dès le niveau 1 le restent à tous les niveaux, donc une partie de la détection tient à des sujets déjà proches du seuil ; détection non monotone pour les images fantômes (0,8 puis 0,6). **Conséquence pratique** (hypothèse, non testée) : le mouvement touchant souvent toute la séance, une alerte sur la T1 pourrait servir d'alerte pour la FLAIR de la même séance, qui reste l'angle mort du QC (J-058).
+
+---
+
+## J-064 — Statistiques de 6.2 recalculées avec les 8 méthodes ; précisions de méthode
+2026-10-08 · Correction
+
+**Constat.** `stats_*.csv` ne contenaient que 7 méthodes : ils avaient été calculés avant l'expérience sur les images `pre/` (J-057, `evaluation_resencmpre.csv`), et le `snakemake --touch` de J-061 a ensuite mis leur date à jour **sans les recalculer** ; le workflow les croyait donc à jour. Leçon : `--touch` enregistre un état, il ne vérifie pas sa cohérence ; à n'utiliser qu'après avoir relancé ce qui dépend d'entrées récentes.
+**Correction.** Statistiques et figures de 6.4 recalculées : 8 méthodes, **28 paires x 5 métriques = 140 tests appariés** (Holm sur les 140), 40 tests connus / inconnus. Aucune conclusion ne change (M1 - DA5 et M1 - `pre/` non significatifs, p Holm = 1 ; toutes les différences M1 - M2 et M1 - M3 à p Holm < 1e-11). M1 sur `pre/` : Dice 0,803 [0,783-0,821].
+**Précisions de méthode (pour la rédaction).** (1) IC bootstrap calculés **pour chaque métrique séparément** (aucun IC n'est déduit de celui du Dice), stratifiés par scanner seulement (composition fixée par le plan du challenge ; la charge lésionnelle est une propriété des patients tirés, donc une vraie source d'incertitude à garder). (2) Comparaisons appariées : différence sujet par sujet pour chaque métrique, IC bootstrap stratifié de la différence moyenne, **test de Wilcoxon pour chaque métrique**, non stratifié par scanner (l'appariement absorbe déjà la difficulté de chaque sujet). (3) Connus / inconnus : 8 méthodes x 5 métriques = 40 tests de Mann-Whitney, **non corrigés** dans le tableau ; avec Holm sur les 40, aucun n'est significatif (plus petit p corrigé : 0,07).
 ---
 
 ## Décisions en attente
