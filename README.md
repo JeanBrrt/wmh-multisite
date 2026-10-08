@@ -148,7 +148,7 @@ Avec quelques variantes :
 
 **But.** L'évaluation (section 4) juge la segmentation voxel par voxel. Une étude clinique, elle, utilise **un chiffre par patient** (« 12 ml de lésions, surtout périventriculaires »), qui alimentera ensuite un modèle pronostique. La question devient : **ce chiffre est-il juste, et est-il aussi juste sur tous les scanners ?** Un biais qui dépend du site créerait un faux effet de site dans une étude multicentrique.
 
-**Biomarqueurs calculés** pour chaque sujet et chaque source de segmentation (O1, M1, M2, M3, DA5 ; O3 et O4 sur l'entraînement), après retrait des zones « autre pathologie » :
+**Biomarqueurs calculés** pour chaque sujet et chaque source de segmentation (O1, M1, M2, M3 ; O3 et O4 sur l'entraînement), après retrait des zones « autre pathologie » :
 - **volume de HSB** (ml), avec le volume exact du voxel, qui varie de 1,75 à 4,72 mm³ selon le scanner ; et en **% du volume intracrânien** (ICV, tiré de la segmentation de WMH-SynthSeg), qui ne diminue pas avec l'atrophie ;
 - **volumes périventriculaire et profond** : un voxel de HSB est périventriculaire s'il est à 10 mm ou moins des ventricules latéraux (segmentés par WMH-SynthSeg), distances en millimètres réels ;
 - **nombre de lésions** (composantes connexes 3D, comme le script officiel), dont celles d'au moins 10 mm³ pour que le compte soit comparable entre résolutions ;
@@ -156,7 +156,7 @@ Avec quelques variantes :
 
 Les volumes obtenus sont identiques à ceux de l'évaluation officielle à 5e-5 ml près. Valeurs de référence (O1, 170 sujets) : volume médian 11,2 ml (0,8 à 195 ml), de 0,44 % de l'ICV (Amsterdam GE 3T) à 1,18 % (Singapour), 80 à 87 % de lésions périventriculaires selon le site ([tableau A10](#a10)).
 
-**Protocole d'accord.** Chaque source est comparée à O1 : M1, DA5, M3 et M2 sur les 110 cas de test ; les experts O3 et O4 sur les 60 cas d'entraînement, qui donnent la **référence humaine**. Pour chaque sujet, on calcule **d = ln(source / O1)**. Le logarithme transforme les erreurs en rapports (« 10 % de trop »), car l'erreur absolue grandit avec le volume (corrélation de Spearman de 0,71 entre l'erreur en ml et le volume, −0,31 sur l'échelle logarithmique).
+**Protocole d'accord.** Chaque source est comparée à O1 : M1, M3 et M2 sur les 110 cas de test ; les experts O3 et O4 sur les 60 cas d'entraînement, qui donnent la **référence humaine**. Pour chaque sujet, on calcule **d = ln(source / O1)**. Le logarithme transforme les erreurs en rapports (« 10 % de trop »), car l'erreur absolue grandit avec le volume (corrélation de Spearman de 0,71 entre l'erreur en ml et le volume, −0,31 sur l'échelle logarithmique).
 
 **Méthodes statistiques.**
 - **Bland-Altman**, la méthode de référence pour comparer deux mesures d'une même grandeur : le **biais** (moyenne des d, ramenée en rapport) dit si la source mesure trop ou trop peu en moyenne ; les **limites d'accord** (biais ± 1,96 écart type) encadrent l'erreur sur 95 % des patients pris un par un.
@@ -354,7 +354,7 @@ Lecture : le **champ de biais** est détecté (60 % au niveau 2) avant que le Di
 | M1 − M3 | **+0,208** [0,186 ; 0,232] | **−16,6** | **−57** | **+0,50** | **+0,50** |
 | M1 − M2 | **+0,400** [0,372 ; 0,429] | **−7,9** | **−278** | **+0,30** | **+0,33** |
 | M3 − M2 | **+0,193** | +8,7 | **−221** | −0,20 | −0,17 |
-| M1 − DA5 | +0,005 (n.s.) | −0,1 (n.s.) | −0,9 (n.s.) | +0,002 (n.s.) | −0,003 (n.s.) |
+| M1 − M1 DA5 | +0,005 (n.s.) | −0,1 (n.s.) | −0,9 (n.s.) | +0,002 (n.s.) | −0,003 (n.s.) |
 | M1 − M1 prétraitement challenge | −0,001 (n.s.) | −0,3 (n.s.) | −0,7 (n.s.) | +0,005 (n.s.) | +0,003 (n.s.) |
 
 <a id="a8"></a>
@@ -395,7 +395,6 @@ Lecture : le **champ de biais** est détecté (60 % au niveau 2) avant que le Di
 | Source (cas) | Volume total | Périventriculaire | Profond | Lésions ≥ 10 mm³ | Biais dépendant du site ? (Kruskal-Wallis, volume total) |
 |---|---|---|---|---|---|
 | **M1 nnU-Net** (test, 110) | **0,98** [0,62-1,55] ; ICC **0,982** [0,975-0,988] | 1,00 [0,64-1,56] ; 0,982 | 0,87 [0,37-2,04] ; 0,964 | 0,82 [0,56-1,21] ; 0,890 | oui (p < 0,001) |
-| M1 + DA5 (test, 110) | 0,90 [0,54-1,49] ; 0,976 | 0,92 [0,56-1,51] ; 0,976 | 0,83 [0,44-1,56] ; 0,975 | 0,79 [0,52-1,22] ; 0,857 | oui (p < 0,001) |
 | M3 seuillage (test, 110) | 1,18 [0,33-4,14] ; 0,814 | 1,21 [0,42-3,52] ; 0,852 | 0,93 [0,05-16,0] ; 0,543 | 0,55 [0,19-1,58] ; 0,305 | oui (p < 0,001) |
 | M2 WMH-SynthSeg (test, 110) | 2,44 [0,41-14,5] ; 0,372 | 2,53 [0,46-14,1] ; 0,349 | 2,23 [0,14-34,6] ; 0,436 | 0,44 [0,21-0,92] ; 0,300 | non (p = 0,10) |
 | Expert O3 (entraînement, 60) | 0,97 [0,60-1,57] ; 0,981 | 0,98 [0,60-1,62] ; 0,980 | 0,86 [0,43-1,73] ; 0,969 | 0,79 [0,51-1,22] ; 0,847 | oui (p < 0,001) |
