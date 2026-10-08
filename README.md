@@ -123,26 +123,26 @@ Avec quelques variantes :
 
 ### 4. Évaluation
 
-**Protocole.** Toutes les méthodes sont évaluées sur les **110 cas de test**, jamais utilisés pour entraîner ni régler quoi que ce soit, contre la référence O1. On utilise le script **officiel** du challenge, copié sans modification, pour que les chiffres soient directement comparables au classement. Les zones « autre pathologie » (label 2) sont ignorées. Cinq métriques complémentaires sont calculées pour chaque sujet :
-- **Dice** : recouvrement des voxels ;
-- **HD95** : distance (mm) entre les contours au 95e centile, sensible aux erreurs éloignées ;
-- **AVD** : erreur relative sur le volume total ;
-- **rappel lésionnel** et **F1 lésionnel** : détection lésion par lésion (composantes connexes 3D), où chaque lésion compte pour 1 quelle que soit sa taille.
+**Protocole.** Toutes les méthodes sont évaluées sur les **110 cas de test** jamais utilisés pour entraîner ni régler quoi que ce soit, contre la référence O1. On utilise le script **officiel** du challenge, copié sans modification, pour que les chiffres soient directement comparables au classement. Les zones « autre pathologie » (label 2) sont ignorées. Cinq métriques complémentaires sont calculées pour chaque sujet :
+- **Dice** : recouvrement des voxels
+- **HD95** : distance (mm) entre les contours au 95e centile, sensible aux erreurs éloignées 
+- **AVD** : erreur relative sur le volume total 
+- **rappel lésionnel** et **F1 lésionnel** : détection lésion par lésion (composantes 27-connexes) où chaque lésion compte pour 1 quelle que soit sa taille.
 
 **Méthodes statistiques.**
-- **Incertitude** : intervalle de confiance à 95 % de chaque moyenne par **bootstrap percentile stratifié par scanner** (2 000 tirages avec remise, à l'intérieur de chaque scanner pour conserver la composition du test). Le Dice étant borné et asymétrique, aucune formule fermée ne convient.
-- **Comparaison de deux méthodes** : sur les mêmes sujets, donc **appariée**. Différence sujet par sujet, intervalle de confiance bootstrap de la différence moyenne, **test de Wilcoxon** signé (sans hypothèse de normalité), et **correction de Holm** sur les 140 tests (8 variantes évaluées, 28 paires, 5 métriques) pour contrôler les faux positifs dus à la multiplicité des tests.
-- **Scanners connus contre inconnus** : deux groupes de patients différents (90 et 20), donc **non appariés**. Différence des moyennes avec un bootstrap de chaque groupe et **test de Mann-Whitney**.
-- **Plafond humain** : les experts O3 et O4 sont notés contre O1 avec les mêmes métriques. Les 12 cas de validation du pli 0 sont les seuls où M1 (qui ne les a pas vus) et les experts sont jugés sur les mêmes images.
-- **Classement** : formule officielle du challenge (chaque métrique ramenée entre 0 pour la meilleure équipe et 1 pour la pire, puis moyenne des 5 rangs), chaque méthode étant insérée seule parmi les 57 équipes publiées.
+- **Incertitude** : intervalle de confiance à 95 % de chaque moyenne par **bootstrap percentile stratifié par scanner** (2 000 tirages avec remise, stratifiés par scanner pour conserver la composition du test).
+- **Comparaison de deux méthodes** : **appariement** sur les mêmes sujets puis différence sujet par sujet, intervalle de confiance bootstrap de la différence moyenne, **test de Wilcoxon** signé (sans hypothèse de normalité) et **correction de Holm** sur les 140 tests (8 variantes évaluées, 28 paires, 5 métriques) pour contrôler les faux positifs dus à la multiplicité des tests.
+- **Scanners connus contre inconnus** : deux groupes de patients différents (90 et 20) donc **non appariés**. Différence des moyennes avec un bootstrap de chaque groupe et **test de Mann-Whitney**.
+- **Plafond humain** : les experts O3 et O4 sont notés contre O1 avec les mêmes métriques. Les 12 cas de validation du fold 0 sont les seuls où M1 (qui ne les a pas vus) et les experts sont jugés sur les mêmes images.
+- **Classement** : formule officielle du challenge (chaque métrique ramenée entre 0 pour la meilleure équipe et 1 pour la pire, puis moyenne des 5 rangs) chaque méthode étant insérée seule parmi les 57 équipes publiées.
 
 **Résultats clés.**
-- **M1 atteint un Dice de 0,802 [0,784-0,820] et la 9e place sur 58** ([tableau A5](#a5)). Il est 2e au Dice et 1er à l'AVD, mais seulement 22e au rappel lésionnel (0,73) : son point faible est la détection des petites lésions. M3 (0,595) et M2 (0,402) sont 55e.
+- **M1 atteint la 9e place sur 58** ([tableau A5](#a5)). Il est 2e au Dice et 1er à l'AVD, mais seulement 22e au rappel lésionnel (0,73) : son point faible est la détection des petites lésions. M3 (0,595) et M2 (0,402) sont 55e.
 - **M1 surpasse M3 et M2 sur les 5 métriques** (p Holm < 1e-9, [tableau A7](#a7)). M3 et M2 ne se dominent pas : M3 a le meilleur recouvrement et le meilleur volume, M2 trouve plus de lésions mais sur-segmente (AVD de 293 %).
 - **Ni l'augmentation forte (DA5) ni le prétraitement des organisateurs ne changent le résultat de M1** (différences de Dice de +0,005 et −0,001, p Holm = 1, [tableau A7](#a7)).
 - **M1 est stable d'un scanner à l'autre** : Dice de 0,776 (Amsterdam Philips) à 0,834 (Singapour) ([tableau A6](#a6)).
-- **Aucune dégradation démontrée sur les scanners inconnus** : Dice 0,790 contre 0,805, différence −0,015 [−0,066 ; +0,030], p = 0,45 ([tableau A8](#a8)). Il en va de même pour toutes les méthodes (plus petit p corrigé par Holm sur les 40 tests : 0,07). Avec 20 cas, l'intervalle reste large : une petite perte ne peut pas être exclue.
-- **M1 est au niveau des experts** : sur les 12 cas partagés, Dice de 0,815 contre 0,757 et 0,781 pour O3 et O4 ([tableau A9](#a9)), et deux experts indépendants ne s'accordent qu'à 0,74 à 0,76. Ce n'est pas « mieux qu'un expert » : M1 a appris le style de O1, contre lequel il est jugé.
+- **M1 ne se dégrade pas de façon démontrée sur les 2 scanners jamais vus à l'entraînement.** Son Dice est de 0,790 sur les 20 cas de ces scanners, contre 0,805 sur les 90 cas des scanners vus : une différence de −0,015, d'intervalle de confiance [−0,066 ; +0,030] et de p = 0,45 ([tableau A8](#a8)). Les autres méthodes (M2, M3 et les variantes) ne montrent pas non plus d'écart significatif entre scanners vus et inconnus. Réserve : avec seulement 20 cas, l'intervalle est large, et une petite perte (jusqu'à environ 0,07 de Dice) ne peut pas être exclue.
+- **M1 est au niveau des experts** : sur les 12 cas partagés, Dice de 0,815 contre 0,757 et 0,781 pour O3 et O4 ([tableau A9](#a9)) et deux experts indépendants ne s'accordent qu'à 0,74 à 0,76. Ce n'est pas forcément « mieux qu'un expert » puisque M1 a pu apprendre le style de labelisation de O1 contre lequel il est jugé.
 
 ### 5. Biomarqueurs
 
