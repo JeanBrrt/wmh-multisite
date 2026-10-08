@@ -68,9 +68,8 @@ DataverseNL ─> BIDS ─> recalage rigide T1→FLAIR ─> masque du cerveau (HD
 
 ### 1. Données et prétraitement
 
-Les données sont téléchargées via l'API Dataverse et converties au format **BIDS 1.10**. Les organisateurs fournissent un prétraitement des images brutes basé sur un recalage **elastix** et une correction du champ de biais par **SPM12**. Le prétraitement est refait autrement ici : la T1 est recalée sur la FLAIR par un recalage rigide (**ANTs**, information mutuelle comme critère, exécution déterministe) et le champ de biais est corrigé par **N4**, estimé dans un masque du cerveau produit par **HD-BET** (sur GPU local), identique sur tous les sites.
+Les données sont téléchargées via l'API Dataverse et converties au format **BIDS 1.10**. Les organisateurs fournissent un prétraitement des images brutes basé sur un recalage **elastix** et une correction du champ de biais par **SPM12**. Le prétraitement est refait autrement ici : la T1 est recalée sur la FLAIR par un recalage rigide (**ANTs**, information mutuelle comme critère) et le champ de biais est corrigé par **N4**, estimé dans un masque du cerveau produit par **HD-BET** (sur GPU local).
 
-**Contrôle de notre recalage contre celui des organisateurs** (169 sujets) : la T1 brute alignée par chacun des deux recalages est comparée (corrélation), et les deux transformations sont appliquées à 5 000 points de la tête (écart en mm, rotation relative).
 
 | | Corrélation avec elastix | Écart moyen (mm) | Écart maximal (mm) | Rotation relative (°) |
 |---|---|---|---|---|
@@ -78,9 +77,13 @@ Les données sont téléchargées via l'API Dataverse et converties au format **
 | Pire cas | 0,974 | 0,69 | 1,36 | 0,75 |
 | Médiane par scanner | 0,988 (GE 1,5T) à 0,999 (Utrecht) | 0,11 à 0,46 | 0,18 à 0,84 | 0,06 à 0,35 |
 
-Les deux recalages sont équivalents à une fraction de voxel près. **Un seul sujet sur 170 est signalé** (sub-146, corrélation 0,905, écart de 2 mm) : sa FLAIR, très bruitée et de contraste atypique, rend l'information mutuelle peu discriminante ; la transformation d'elastix est utilisée pour lui seul, comme exception documentée (J-039).
+| Corrélation des champs de biais N4 / SPM12 (médiane, 60 sujets d'entraînement) | Amsterdam GE 3T | Singapour | Utrecht |
+|---|---|---|---|
+| FLAIR | 0,88 | 0,74 | 0,85 |
+| T1 | 0,94 | 0,97 | 0,98 |
 
-**Effet de ce prétraitement sur la segmentation** : appliqué aux images prétraitées par les organisateurs, le même modèle nnU-Net obtient exactement le même Dice (0,803 contre 0,802, p = 0,91 ; J-057). Notre chaîne n'apporte pas de gain de performance ; elle apporte la maîtrise et la traçabilité depuis les données brutes.
+
+Les deux recalages sont équivalents à une fraction de voxel près, et le même modèle nnU-Net obtient exactement le même Dice (0,803 contre 0,802, p = 0,91). Notre prétraitement n'apporte pas de gain de performance mais plutôt la traçabilité depuis les données brutes.
 
 Pour les cartes de groupe, chaque sujet est recalé sur le modèle **MNI152** par un recalage non linéaire **SyN**. La corrélation croisée (CC) remplace l'information mutuelle comme critère : elle est plus gourmande en calcul, mais indispensable pour suivre les **ventricules dilatés** des sujets atrophiés, que le réglage par défaut ne ramène pas dans le contour du modèle (sur un sujet atrophié : volume ventriculaire estimé 86 ml avec CC contre 26 ml avec le réglage par défaut). Le calcul sur le modèle à 2 mm divise le temps par 8 (6 min au lieu de 50 par sujet) pour une qualité presque identique (J-054).
 
