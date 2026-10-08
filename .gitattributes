@@ -1,3 +1,6 @@
 *.ipynb filter=nbstripout
 *.zpln filter=nbstripout
 *.ipynb diff=ipynb
+*.sh text eol=lf
+*.def text eol=lf
+Dockerfile text eol=lf

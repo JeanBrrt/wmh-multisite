@@ -1,4 +1,5 @@
-# Continuous integration (ROADMAP step 9.3, J-061): lint and tests on every push and pull request.
+# Continuous integration (ROADMAP steps 9.3 and 9.4, J-061, J-062): lint, tests and the Docker image
+# on every push and pull request.
 # No data is needed: the tests build tiny synthetic images (J-029). The environment is the locked one
 # (uv.lock), so the CI runs the same versions as the development machine.
 name: ci
@@ -24,11 +25,27 @@ jobs:
 
       - name: Lint (ruff)
         run: |
-          uv run ruff check src tests scripts
-          uv run ruff format --check src tests scripts
+          uv run ruff check src tests scripts hpc
+          uv run ruff format --check src tests scripts hpc
 
       - name: Workflow syntax (Snakemake)
         run: uv run snakemake -s workflow/Snakefile --lint || true   # advisory: the DAG needs the data
 
       - name: Tests (pytest)
         run: uv run pytest -q --cov=wmh_multisite --cov-report=term
+
+  # 9.4: the CPU image must build from the locked environment and import the pipeline
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the CPU image
+        run: docker build -f containers/Dockerfile -t wmh-multisite:ci .
+
+      - name: Smoke test
+        run: |
+          docker run --rm wmh-multisite:ci python -c "import wmh_multisite, ants, SimpleITK, nibabel, neuroHarmonize; print('imports ok')"
+          docker run --rm wmh-multisite:ci snakemake --version
+          docker run --rm wmh-multisite:ci python -m wmh_multisite.evaluate.metrics --help

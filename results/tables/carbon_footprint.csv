@@ -1,0 +1,11 @@
+stage,where,hardware,hours,power_w,pue,kwh,kg_co2eq,method,source
+"official evaluation of M1, 110 test cases",local,laptop (CodeCarbon),0.006571,73.58,1,0.0004835,2.71e-05,measured,CodeCarbon
+"NAWM features, 170 subjects (8.2)",local,laptop (CodeCarbon),0.01208,65.45,1,0.0007906,4.43e-05,measured,CodeCarbon
+site classifier + ComBat (8.3),local,laptop (CodeCarbon),0.0001739,59.13,1,1.029e-05,5.764e-07,measured,CodeCarbon
+nnU-Net M1 training (250 epochs),Kaggle,2 x T4 (70 W) + CPU (40 W),10.55,180,1.1,2.089,0.9922,estimated,J-038
+nnU-Net DA5 training (250 epochs),Kaggle,2 x T4 (70 W) + CPU (40 W),9.931,180,1.1,1.966,0.934,estimated,J-052
+"WMH-SynthSeg, 170 subjects (CPU)",Kaggle,"4 vCPU, 30 GB RAM (40 W)",16.53,40,1.1,0.7272,0.3454,estimated,J-053
+"SyN to MNI, 170 subjects",local,"laptop CPU, 12 threads (60 W)",8,60,1,0.48,0.0269,estimated,J-054
+"HD-BET brain masks, 170 subjects",local,RTX 4060 laptop + CPU (100 W),0.7833,100,1,0.07833,0.00439,estimated,J-033
+"nnU-Net inference, 3 x 110 cases",local,RTX 4060 laptop + CPU (100 W),0.925,100,1,0.0925,0.005184,estimated,J-052
+"nnU-Net robustness, 160 inferences",local,RTX 4060 laptop + CPU (100 W),0.4914,100,1,0.04914,0.002754,estimated,J-058

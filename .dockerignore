@@ -1,0 +1,16 @@
+# Never in an image: data (CC BY-NC 4.0, size), personal documents, results, environments
+data/
+results/
+ressource/
+notes/
+kaggle/*.zip
+.venv/
+.git/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+.snakemake/
+*.nii
+*.nii.gz
+*.pth
+*.zip

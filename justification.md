@@ -743,6 +743,30 @@ Un seul triplet (t, e, m) pour tous les scanners, choisi par recherche sur grill
 
 **9.1.** `workflow/Snakefile` **au niveau des étapes** : chaque règle appelle un module du paquet sur tous les sujets (les modules sautent le travail déjà fait), de `download` à `figures`, en passant par le QC, les biomarqueurs, les cartes MNI et l'harmonisation (24 tâches pour la cible `all`). Les deux étapes faites sur Kaggle (entraînements nnU-Net, WMH-SynthSeg) sont des **règles externes** : elles échouent avec les instructions (notebook à lancer) si leurs fichiers manquent, et sont ignorées s'ils sont présents. `ancient()` sur les entrées des étapes coûteuses ou externes : seule leur existence compte, pour qu'une réécriture de rapport ne déclenche jamais un nouvel entraînement Kaggle ni 8 h de recalage. Le projet ayant été calculé étape par étape, `snakemake --touch` a enregistré l'état existant : `snakemake -n` répond « Nothing to be done ». Alternative écartée : règles par sujet (170 x ~20 fichiers par étape) : DAG lourd, et les modules gèrent déjà le parallélisme et la reprise sous watchdog. Le linter de Snakemake recommande une directive `log:` et un environnement par règle : non fait (environnement unique verrouillé par uv).
 **9.3.** `.github/workflows/ci.yml` : à chaque push, environnement verrouillé (`uv sync --frozen --extra local`), `ruff check` et `ruff format --check`, linter Snakemake (indicatif), pytest avec couverture. Vérifié localement avant le premier passage : verrou à jour, 66 fichiers formatés, lint sans erreur, **155 tests** passent. La construction de l'image Docker sera ajoutée avec 9.4.
+
+---
+
+## J-062 — Conteneurs, script SLURM pour Jean Zay (9.4) et empreinte carbone (9.5)
+2026-10-08 · Actée
+
+**9.4, conteneurs.** `containers/Dockerfile` : une seule recette, deux images selon `UV_EXTRAS` (groupes de dépendances de `pyproject.toml`), environnement **verrouillé** (`uv sync --frozen`, mêmes versions que le poste et l'intégration continue). Image CPU par défaut (`harmonize`, `workflow`) : prétraitement, indicateurs QC, seuillage, évaluation, biomarqueurs, harmonisation, Snakemake ; sans PyTorch, donc légère. Image GPU (`+ seg`) : nnU-Net et HD-BET (PyTorch CUDA sous Linux) et les trainers du projet, copiés dans nnU-Net. `.dockerignore` : données, résultats, `ressource/`, `notes/` et archives n'entrent jamais dans une image. Les trainers personnalisés (`nnUNetTrainerWMH_250`, `_DA5_250`), jusqu'ici écrits par les notebooks Kaggle, ont une source unique dans `hpc/wmh_multisite_trainers.py`. **Vérification** : Docker ne tourne pas en local (J-005) ; l'intégration continue construit l'image CPU à chaque push et teste les imports, Snakemake et une commande du paquet. `containers/apptainer.def` : image GPU pour le calcul intensif (Apptainer/Singularity, construite hors du cluster).
+**9.4, SLURM.** `hpc/slurm_jeanzay.sh` : tableau de 5 tâches (un pli par GPU V100 32 Go, 20 h, 10 cœurs), reprise automatique sur point de contrôle (`--c`), instructions de préparation (prétraitement nnU-Net une fois, `splits_final.json` de J-032) et commande d'ensemble des 5 plis. **Non testé** (pas de compte Jean Zay), écrit d'après la documentation de l'IDRIS : compte, contrainte de partition et nom du module à vérifier ; indiqué en tête de fichier. Il comble la principale limite d'entraînement (J-037 : un seul pli, sans ensemble, faute de GPU).
+**9.5, empreinte carbone.** `scripts/carbon_footprint.py`, deux types de chiffres jamais confondus (colonne `method`). **Mesuré** (CodeCarbon, suivi hors ligne, réseau français 0,056 kg CO2eq/kWh) sur des étapes rejouables sans rien écrire : évaluation officielle de M1, caractéristiques SB saine, ComBat ; ~75 W en moyenne. Sous Windows, CodeCarbon estime la puissance CPU par son enveloppe thermique (pas de compteur RAPL). **Estimé** pour les longs calculs déjà faits : puissance (enveloppes thermiques, donc majorants) x durée tirée du journal x PUE (1,1 pour le nuage), intensité mondiale moyenne (0,475 kg/kWh) pour Kaggle, dont la région est inconnue. **Total : ~5,5 kWh et ~2,3 kg CO2eq**, à 98 % sur Kaggle (deux entraînements nnU-Net ~1 kg chacun, WMH-SynthSeg 0,35 kg) ; le local pèse 0,04 kg grâce au réseau français. Ordres de grandeur seulement ; non comptés : essais de faisabilité et de chronométrage sur Kaggle, sessions interrompues.
+
+---
+
+## J-063 — Détection des artefacts simulés sur la T1 (extension de 4.3)
+2026-10-08 · Constat
+
+**Mise en oeuvre.** Même protocole que 4.3 (J-051) sur la T1 brute (`qc.artifacts --modality T1w`) : 10 sujets utilisables (2 par scanner), 4 artefacts TorchIO, 4 niveaux, la FLAIR intacte ; indicateurs de la T1 sur sa grille d'origine. Fichiers `results/tables/qc_artifacts_T1w.csv`, `results/figures/qc_artifact_detection_T1w.png`.
+**Résultats (part des 10 sujets classés « à vérifier » ou « à exclure », niveaux 1 à 4 ; niveau 0 : aucune fausse alerte dans les deux modalités).**
+| Artefact | FLAIR (J-051) | T1 |
+|---|---|---|
+| Champ de biais | 0 / 0,6 / 1 / 1 | 0,1 / 0,5 / 1 / 1 |
+| Bruit | 0,3 / 0,5 / 0,6 / 0,7 | 0,1 / 0,4 / 0,4 / 0,8 |
+| Images fantômes | 0,2 / 0,2 / 0,2 / 0,6 | **0,8 / 0,6 / 0,6 / 1** |
+| **Mouvement** | 0,2 / 0,2 / 0,2 / 0,2 (non concluant) | **0,5 / 0,5 / 0,7 / 0,7** |
+**Lecture.** Les indicateurs de MRIQC, conçus pour la T1, y sont plus sensibles : le **mouvement**, que le QC ne détecte pas en FLAIR, est détecté sur la T1 chez la moitié des sujets dès le niveau 1, et de plus en plus avec le niveau (indicateurs en cause : CJV, SNR de Dietrich, champ de biais). Réserves : 10 sujets ; 5 sujets détectés dès le niveau 1 le restent à tous les niveaux, donc une partie de la détection tient à des sujets déjà proches du seuil ; détection non monotone pour les images fantômes (0,8 puis 0,6). **Conséquence pratique** (hypothèse, non testée) : le mouvement touchant souvent toute la séance, une alerte sur la T1 pourrait servir d'alerte pour la FLAIR de la même séance, qui reste l'angle mort du QC (J-058).
 ---
 
 ## Décisions en attente
