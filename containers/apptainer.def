@@ -1,0 +1,55 @@
+# wmh-multisite Apptainer / Singularity image for HPC (ROADMAP step 9.4, J-062): the GPU image
+# (nnU-Net, HD-BET with CUDA PyTorch) plus every CPU stage of the pipeline.
+#
+# NOT TESTED on Jean Zay (no account): written from the IDRIS documentation, to check before use.
+# Build it on a machine with Apptainer (image building is not possible on the cluster), from the
+# repository root:
+#     apptainer build wmh-multisite.sif containers/apptainer.def
+# then copy the .sif to the cluster and register it (IDRIS: `idrcontmgr cp wmh-multisite.sif`).
+# Run with the GPU (`--nv`) and the data bound to the project folder:
+#     apptainer exec --nv --bind $WORK/wmh/data:/opt/wmh-multisite/data wmh-multisite.sif nnUNetv2_train ...
+
+Bootstrap: docker
+From: python:3.12-slim
+
+%files
+    pyproject.toml /opt/wmh-multisite/pyproject.toml
+    uv.lock /opt/wmh-multisite/uv.lock
+    README.md /opt/wmh-multisite/README.md
+    src /opt/wmh-multisite/src
+    config /opt/wmh-multisite/config
+    workflow /opt/wmh-multisite/workflow
+    scripts /opt/wmh-multisite/scripts
+    hpc /opt/wmh-multisite/hpc
+
+%post
+    set -e
+    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
+    curl -LsSf https://astral.sh/uv/0.11.6/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+    cd /opt/wmh-multisite
+    export UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
+    uv sync --frozen --no-dev --extra harmonize --extra workflow --extra seg
+    NNUNET_DIR=$(.venv/bin/python -c 'import nnunetv2, os; print(os.path.dirname(nnunetv2.__file__))')
+    cp hpc/wmh_multisite_trainers.py "$NNUNET_DIR/training/nnUNetTrainer/variants/"
+    chmod -R a+rX /opt/wmh-multisite
+
+%environment
+    export PATH=/opt/wmh-multisite/.venv/bin:$PATH
+    export MPLBACKEND=Agg
+    export nnUNet_raw=/opt/wmh-multisite/data/nnunet/nnUNet_raw
+    export nnUNet_preprocessed=/opt/wmh-multisite/data/nnunet/nnUNet_preprocessed
+    export nnUNet_results=/opt/wmh-multisite/data/nnunet/nnUNet_results
+    export TEMPLATEFLOW_HOME=/opt/wmh-multisite/data/templateflow
+
+%runscript
+    cd /opt/wmh-multisite && exec "$@"
+
+%test
+    /opt/wmh-multisite/.venv/bin/python -c "import wmh_multisite, nnunetv2, ants, SimpleITK; print('ok')"
+
+%labels
+    Title wmh-multisite
+    Description Multi-site WMH pipeline: preprocessing, QC, segmentation, evaluation, biomarkers, harmonisation
+
+%help
+    Multi-site white matter hyperintensity pipeline (MICCAI WMH 2017). See README.md and workflow/Snakefile.

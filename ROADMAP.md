@@ -82,7 +82,7 @@ orig/ (FLAIR + T1 3D brutes, 5 scanners)
 | 1.2 | `pyproject.toml` (dépendances de base + extras `qc`, `harmonize`, `seg`, `workflow`, `dev`, `local`) ; environnement **uv** (`uv sync --extra local`, `uv.lock` versionné, J-021) ; correctif neuroHarmonize (J-022) | 45 min | [x] |
 | 1.3 | `config/config.yaml` : chemins, liste des scanners/sites, split train/test, paramètres par étape | 30 min | [x] (valeurs TBD tracées ; `flair_acquisition` = protocole du readme) |
 | 1.4 | `utils/io.py` (load, load_data, load_labels, save_like, same_grid, describe) et `utils/guard.py` (watchdog RAM/VRAM, J-005) ; notebook d'exploration `notebooks/01_explore_nifti.ipynb` | 45 min | [x] (testés à la main sur Utrecht 0 ; tests pytest en 9.2) |
-| 1.5 | Dépôt GitHub, premier commit et push | 10 min | [~] premier commit le 2026-10-06 (159 fichiers, aucune donnée ni document personnel ; `notes/` laissé à l'utilisateur) ; dépôt GitHub à créer par l'utilisateur |
+| 1.5 | Dépôt GitHub, premier commit et push | 10 min | [x] dépôt public github.com/JeanBrrt/wmh-multisite ; premier passage de l'intégration continue réussi (2026-10-06) |
 
 **Fini quand** : `pip install -e .` fonctionne et `import wmh_multisite` passe.
 
@@ -123,7 +123,7 @@ Entrée : `orig/` brut. Sortie : FLAIR + T1 dans l'espace FLAIR natif, masques, 
 |---|---|---|---|---|
 | 4.1 | `qc/iqm.py` : SNR, CNR, CJV, EFC, FBER, contraste SB/SG sur FLAIR et T1 (définitions MRIQC, J-011) **Rappeler J-028 avant d'implémenter.** | 1 h 30 | P1 | [x] 170 sujets, 15 min ; CJV et rapport SB/SG jugés pour la T1 seulement (J-051) |
 | 4.2 | `qc/outliers.py` : z-scores robustes + IsolationForest → classes *utilisable / à vérifier / à exclure* **Rappeler J-028 avant d'implémenter.** | 1 h | P1 | [x] 136 usable / 30 check / 4 exclude ; aucun lien avec le Dice de M1 (p = 0,90) (J-051) |
-| 4.3 | `qc/artifacts.py` : injection d'artefacts TorchIO (mouvement, bruit, biais, ghosting) à intensité croissante → courbe de détection | 1 h | P1 | [x] biais et bruit détectés, mouvement non concluant (artefact de la simulation), 0 fausse alerte (J-051) ; **extension faite** : nnU-Net sur FLAIR dégradées (10 sujets de test x 4 artefacts x 4 niveaux) : le mouvement nuit dès le niveau 1 (Dice 0,79 -> 0,74, rappel 0,72 -> 0,53) sans être détecté ; le biais est détecté avant de nuire (J-058) |
+| 4.3 | `qc/artifacts.py` : injection d'artefacts TorchIO (mouvement, bruit, biais, ghosting) à intensité croissante → courbe de détection | 1 h | P1 | [x] biais et bruit détectés, mouvement non concluant (artefact de la simulation), 0 fausse alerte (J-051) ; **extension faite** : nnU-Net sur FLAIR dégradées (10 sujets de test x 4 artefacts x 4 niveaux) : le mouvement nuit dès le niveau 1 (Dice 0,79 -> 0,74, rappel 0,72 -> 0,53) sans être détecté ; le biais est détecté avant de nuire (J-058) ; T1 : le mouvement y est détecté (50 à 70 %), contrairement à la FLAIR (J-063) |
 | 4.4 | `viz/report.py` : rapport QC HTML (tableau + vignettes des cas signalés) | 45 min | P1 | [x] `results/qc/qc_report.html`, 28 sujets avec vignettes, local (J-051) |
 
 ---
@@ -183,8 +183,8 @@ Pas de données démographiques → le « signal biologique à conserver » est 
 | 9.1 | `workflow/Snakefile` + règles : chaîne locale de bout en bout (étapes Kaggle documentées comme étapes externes) | 1 h 30 | P1 | [x] Snakefile par étapes, règles externes Kaggle, `ancient()` ; état existant enregistré, `-n` : rien à faire (J-061) |
 | 9.2 | Tests pytest (fixtures synthétiques : sphères, bruit) | 1 h | P1 | [x] 155 tests sur données synthétiques, sans réseau (J-029) |
 | 9.3 | GitHub Actions : ruff, pytest, construction + test rapide de l'image Docker (Docker absent en local, J-005) | 45 min | P1 | [x] GitHub Actions : uv verrouillé, ruff, pytest + couverture ; Docker à ajouter avec 9.4 (J-061) |
-| 9.4 | `containers/Dockerfile`, `containers/apptainer.def`, `hpc/slurm_jeanzay.sh` (fourni **non testé**, indiqué comme tel) | 1 h | P1 | [ ] |
-| 9.5 | CodeCarbon : empreinte des étapes principales | 20 min | P2 | [ ] **non réalisé, par choix (2026-10-06)** : priorité donnée aux analyses ; à faire si le temps le permet (mesure de l'empreinte des étapes principales : prétraitement, inférence, QC) |
+| 9.4 | `containers/Dockerfile`, `containers/apptainer.def`, `hpc/slurm_jeanzay.sh` (fourni **non testé**, indiqué comme tel) | 1 h | P1 | [x] Dockerfile (image CPU construite par l'intégration continue, image GPU), apptainer.def, SLURM 5 plis pour Jean Zay **non testé** (J-062) |
+| 9.5 | CodeCarbon : empreinte des étapes principales | 20 min | P2 | [x] CodeCarbon : mesure locale + estimation des longs calculs, ~2,3 kg CO2eq dont 98 % Kaggle (J-062) |
 
 ---
 

@@ -39,6 +39,7 @@ rule all:
         f"{TABLES}/stats_agreement.csv",
         f"{TABLES}/mni_map_agreement.csv",
         f"{TABLES}/qc_artifacts.csv",
+        f"{TABLES}/qc_artifacts_T1w.csv",
         f"{TABLES}/robustness_nnunet.csv",
         "results/qc/qc_report.html",
         f"{TABLES}/harmonization_site_classifier.csv",
@@ -172,10 +173,12 @@ rule qc_outliers:
     output: f"{TABLES}/qc_flags.csv"
     shell: f"{PY}.qc.outliers"
 
-rule qc_artifacts:
+rule qc_artifacts:  # simulated artifacts on the FLAIR (J-051) and on the T1 (J-063)
     input: f"{TABLES}/qc_flags.csv"
-    output: f"{TABLES}/qc_artifacts.csv"
-    shell: f"{PY}.qc.artifacts"
+    output: f"{TABLES}/qc_artifacts{{suffix}}.csv"
+    params: modality=lambda w: "T1w" if w.suffix == "_T1w" else "FLAIR"
+    wildcard_constraints: suffix="|_T1w"
+    shell: f"{PY}.qc.artifacts --modality {{params.modality}}"
 
 rule qc_report:  # local only, never published (patient thumbnails)
     input: f"{TABLES}/qc_flags.csv"
