@@ -67,7 +67,7 @@ REMOTE = [
             "readme.pdf",
             "training/Utrecht/0/orig/FLAIR.nii.gz",
             "training/Utrecht/0/orig/T1.nii.gz",
-            "training/Utrecht/0/pre/3DT1.nii.gz",  # not in keep (J-015)
+            "training/Utrecht/0/pre/3DT1.nii.gz",  # not in keep
             "training/Utrecht/0/wmh.nii.gz",
             "test/Amsterdam/GE1T5/150/orig/FLAIR.nii.gz",
             "test/Amsterdam/GE1T5/150/orig/FLAIR_mask.nii.gz",

@@ -1,11 +1,11 @@
-"""Carbon footprint of the project (ROADMAP step 9.5, J-062).
+"""Carbon footprint of the project.
 
 Two kinds of numbers, never mixed up (column ``method``):
 
-1. **measured**: CodeCarbon (offline tracker, France grid) around stages that can be re-run locally
+1. measured: CodeCarbon (offline tracker, France grid) around stages that can be re-run locally
    without changing any output (computed in memory, nothing written): official evaluation of M1 on the
-   110 test cases, NAWM features of the 170 subjects (8.2), site classifier and ComBat (8.3).
-2. **estimated**: the long runs already done (Kaggle trainings, WMH-SynthSeg, SyN, HD-BET, inference)
+   110 test cases, NAWM features of the 170 subjects, site classifier and ComBat.
+2. estimated: the long runs already done (Kaggle trainings, WMH-SynthSeg, SyN, HD-BET, inference)
    cannot be measured afterwards: energy = power x duration x PUE, emissions = energy x carbon
    intensity. Durations come from the decision log; powers are hardware TDPs (upper bounds); the
    Kaggle region is unknown, so the world average intensity is used. Orders of magnitude only.

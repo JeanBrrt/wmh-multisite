@@ -1,18 +1,15 @@
-"""Evaluation of the segmentations with the official challenge metrics (ROADMAP step 6.1, J-012).
+"""Evaluation of the segmentations with the official challenge metrics.
 
 For each subject, the prediction (FLAIR grid, 0/1) is compared with the manual reference standard
 (O1, FLAIR grid, 0 background / 1 WMH / 2 other pathology) by the official functions vendored in
 ``wmh_challenge.py``:
 
-- **Dice** (DSC): voxel overlap, 2|A n B| / (|A| + |B|); 1 = perfect.
-- **HD95** (mm): 95th percentile of the distances between the lesion *boundaries* of the two masks,
-  taken in both directions (the larger of the two); 0 = perfect. Undefined (NaN) if nothing is
-  predicted.
-- **AVD** (%): absolute difference of total WMH volume, relative to the true volume; 0 = perfect.
-- **Lesion recall**: share of the true lesions (3D connected components, 26-connectivity) touched
-  by at least one predicted voxel; 1 = every lesion found.
-- **Lesion F1**: harmonic mean of that recall and the lesion precision (share of predicted
-  components touching a true lesion).
+- Dice: voxel overlap, 2|A n B| / (|A| + |B|).
+- HD95 (mm): 95th percentile of the boundary distances, the larger of the two directions. NaN if
+  nothing is predicted.
+- AVD (%): absolute difference of total WMH volume, relative to the true volume.
+- Lesion recall: share of the true lesions (26-connected components) touched by a predicted voxel.
+- Lesion F1: harmonic mean of that recall and the lesion precision.
 
 Voxels of label 2 are removed from the prediction before every metric (``getImages``), as in the
 challenge. The leaderboard averages each metric over the test scans (HD95 NaN cases aside).
@@ -50,11 +47,9 @@ METRICS = ["dice", "hd95_mm", "avd_pct", "lesion_recall", "lesion_f1"]
 def evaluate_case(truth: str | Path, prediction: str | Path) -> dict[str, float]:
     """The five official metrics for one subject, plus the true and predicted WMH volumes (ml).
 
-    Pitfall of the official ``getImages``: it isolates WMH with ``BinaryThreshold(test, 0.5, 1.5)``.
-    On an *integer* reference map, SimpleITK casts these thresholds to 0 and 1, so every voxel counts
-    as WMH and the "other pathology" mask then erases the prediction: all metrics silently collapse.
-    The challenge files are float32, so the leaderboard is not affected; to be safe whatever the
-    storage type, the reference is always passed to the official code as a float32 copy.
+    The reference is passed as float32: on an integer map, SimpleITK casts the thresholds of the
+    official ``BinaryThreshold(test, 0.5, 1.5)`` to 0 and 1, every voxel becomes WMH and all metrics
+    silently collapse. The challenge files are float32, so the leaderboard itself is fine.
     """
     with tempfile.TemporaryDirectory() as tmp:
         truth_f32 = Path(tmp) / "truth_float32.nii.gz"

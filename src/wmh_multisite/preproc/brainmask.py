@@ -1,19 +1,12 @@
-"""HD-BET brain masks, computed locally on the GPU (ROADMAP step 3.3).
+"""HD-BET brain masks on the local GPU.
 
-HD-BET (Isensee et al., Hum Brain Mapp 2019) is a pretrained brain extraction network built on
-nnU-Net: we only run inference. Its input is the raw 3D T1 at 1 mm (J-033); its output is a binary
-mask on the grid of that T1.
+HD-BET (Isensee et al., Hum Brain Mapp 2019) is a pretrained nnU-Net for brain extraction; we only run
+inference, on the raw 3D T1 at 1 mm. The project environment has a CPU-only PyTorch, so HD-BET runs in
+a temporary uv environment through ``hdbet_worker.py``, one batch per worker process, under the memory
+watchdog. Subjects that already have a mask are skipped, so an interrupted run can just be restarted.
 
-How it runs (J-033):
-- the project environment has a CPU-only PyTorch, so HD-BET runs in a separate, temporary uv
-  environment (CUDA PyTorch + HD-BET), through ``hdbet_worker.py``;
-- subjects are processed in batches; each batch is one worker process, run under the memory
-  watchdog (RAM and GPU memory limits), with a hard GPU memory cap inside PyTorch;
-- subjects that already have a mask are skipped, so an interrupted run can simply be restarted.
-
-Every mask written by HD-BET is then checked (grid of its T1, values 0/1) before it enters the
-derivatives, carried onto the FLAIR grid with the subject's rigid transform (step 3.2, ``genericLabel``
-interpolation, never linear for a mask), and summarized in a QC table.
+Each mask is checked (T1 grid, values 0/1), carried onto the FLAIR grid with the rigid transform
+(``genericLabel``) and summarized in a QC table.
 
 Outputs, in ``data/derivatives/wmh-multisite/sub-XXX/anat/``:
     sub-XXX_space-T1w_desc-brain_mask.nii.gz      HD-BET mask on the T1 grid
@@ -145,7 +138,7 @@ def run_hdbet(cfg: dict[str, Any], subjects: list[str]) -> list[dict[str, Any]]:
 
 
 def to_flair_grid(cfg: dict[str, Any], sub: str, overwrite: bool = False) -> Path | None:
-    """Carry the T1-grid brain mask onto the FLAIR grid with the rigid transform of step 3.2.
+    """Carry the T1-grid brain mask onto the FLAIR grid with the rigid transform.
 
     Returns None if the subject has not been registered yet (its mask stays on the T1 grid).
     """
@@ -173,7 +166,7 @@ def qc_row(cfg: dict[str, Any], sub: str) -> dict[str, Any]:
         "n_components": int(n),
         "largest_component_frac": round(float(sizes.max() / max(sizes.sum(), 1)), 4),
     }
-    if p["t1_head"].is_file():  # the brain must lie inside the head (N4 mask, step 3.1)
+    if p["t1_head"].is_file():  # the brain must lie inside the head
         head = io.load_labels(p["t1_head"], allowed=(0, 1)).astype(bool)
         row["brain_inside_head_frac"] = round(float((t1_mask & head).sum() / max(t1_mask.sum(), 1)), 4)
     if p["brain_flair"].is_file():

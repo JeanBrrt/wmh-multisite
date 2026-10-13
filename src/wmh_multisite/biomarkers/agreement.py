@@ -1,19 +1,18 @@
-"""Agreement between predicted and manual biomarkers, overall and per site (ROADMAP step 7.4, J-049).
+"""Agreement between predicted and manual biomarkers, overall and per site.
 
-Why: a clinician or a multi-site study uses one number per patient, the WMH volume. The question is not
-the voxel overlap (6.1) but "is the volume right?", and above all "is it equally right on every
-scanner?": a site-dependent bias would create a site effect that does not come from the patients.
+A clinician or a multi-site study uses one number per patient, the WMH volume. So the question here is
+not voxel overlap but "is the volume right, and equally right on every scanner?". A site-dependent bias
+would create a site effect that has nothing to do with the patients.
 
-    biomarkers.csv (7.1, 7.3)
+    biomarkers.csv
       test      : M1, M3 (then M2, DA5)  vs O1
       training  : O3, O4 (60) and M1 on the 12 fold-0 validation subjects  vs O1   (human reference)
         |   per subject: d = ln(rater / O1)        (volumes span 0.8 to 195 ml: errors grow with the
         |                                           volume, Spearman 0.71 in ml, -0.31 on the log scale)
         v
-    1. Bland-Altman: bias = mean(d); limits of agreement = 2.5th and 97.5th percentiles of d (empirical,
-       J-066: d is skewed, so bias +/- 1.96 SD misplaces them), with a bootstrap CI stratified by scanner;
-       the parametric limits (bias +/- 1.96 SD), skewness and Shapiro-Wilk p are kept for comparison;
-       everything back-transformed to ratios
+    1. Bland-Altman: bias = mean(d); limits of agreement = 2.5th and 97.5th percentiles of d (d is
+       skewed, so bias +/- 1.96 SD would misplace them), bootstrap CI stratified by scanner; parametric
+       limits, skewness and Shapiro-Wilk p kept for comparison; all back-transformed to ratios
     2. ICC(A,1), absolute agreement, on ln(value), with a bootstrap CI stratified by scanner
     3. bias per scanner (bootstrap CI, Wilcoxon against 0, Holm) + Kruskal-Wallis across scanners:
        does the bias depend on the site?
@@ -29,12 +28,10 @@ ANOVA of the n x k table (subjects x raters):
 MSR, MSC, MSE: mean squares of rows (subjects), columns (raters) and residual. Unlike the "consistency"
 ICC, a constant bias between raters lowers it.
 
-Biomarkers: ``wmh_ml`` (primary), the periventricular and deep volumes of 7.2 (does a method measure
-the scattered deep lesions as well as the periventricular plaques?), and the lesion count
-``n_lesions_ge10mm3`` (secondary, comparable across sites; transformed with ln(x + 1) since a count can
-be 0). A volume of 0 cannot be log-transformed:
-such subjects are excluded and counted in ``n_excluded``. A site bias is reported as *associated* with
-the site: without demographics, scanner and population cannot be separated (J-004).
+Biomarkers: ``wmh_ml`` (primary), the periventricular and deep volumes (are the scattered deep lesions
+measured as well as the periventricular plaques?), and ``n_lesions_ge10mm3`` (ln(x + 1), since a count
+can be 0). A volume of 0 has no log: those subjects are dropped and counted in ``n_excluded``. A site
+bias is only "associated" with the site: without demographics, scanner and population are confounded.
 
 Usage:
     uv run python -m wmh_multisite.biomarkers.agreement
@@ -59,7 +56,7 @@ log = logging.getLogger(__name__)
 MIN_SUBJECTS = 3  # below this, no bias, CI or test is reported (e.g. a scanner with 1 or 2 subjects)
 BIOMARKERS = {
     "wmh_ml": "log",
-    # 7.2: subjects with no deep (or no periventricular) WMH are excluded from these two (n_excluded)
+    # subjects with no deep (or no periventricular) WMH are excluded from these two (n_excluded)
     "wmh_periventricular_ml": "log",
     "wmh_deep_ml": "log",
     "n_lesions_ge10mm3": "log1p",
@@ -255,7 +252,7 @@ def run(cfg: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Agreement of predicted vs manual biomarkers (7.4).")
+    parser = argparse.ArgumentParser(description="Agreement of predicted vs manual biomarkers.")
     parser.add_argument("--config")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)

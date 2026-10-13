@@ -1,17 +1,14 @@
-"""WMH load: volume and fraction of the brain (ROADMAP step 7.1, J-048).
+"""WMH load: volume and fraction of the brain.
 
-- **WMH volume** (ml) = number of WMH voxels x voxel volume. The voxel volume differs between scanners
-  (FLAIR grid: 1.75 mm3 at Amsterdam Philips to 4.72 mm3 at Amsterdam GE 1.5T), so voxels are never
-  compared without this conversion.
-- **Fraction of the brain** (%) = WMH volume / volume of the HD-BET brain mask (J-028, rule A: never the
-  head mask, whose extent depends on defacing and on the site). Limit: the brain shrinks with atrophy,
-  so at equal WMH volume the fraction rises.
-- **Fraction of the intracranial volume** (%), the reference normalisation: the ICV does not shrink with
-  atrophy (the space left by the brain fills with CSF). ICV = every labelled voxel of the 1 mm
-  WMH-SynthSeg segmentation (brain, ventricles, extracerebral CSF; label 0 = outside the skull).
+- WMH volume (ml) = WMH voxels x voxel volume. Voxels go from 1.75 mm3 (Amsterdam Philips) to 4.72 mm3
+  (Amsterdam GE 1.5T), so voxel counts are never compared as such.
+- Fraction of the brain (%) = WMH volume / HD-BET brain volume. Never the head mask, whose extent
+  depends on defacing and on the site. The brain shrinks with atrophy, which inflates this fraction.
+- Fraction of the intracranial volume (%), which does not shrink with atrophy (CSF fills the space).
+  ICV = every labelled voxel of the 1 mm WMH-SynthSeg segmentation.
 
-The "other pathology" regions (label 2 of the reference O1) are removed from every segmentation before
-any count, as in the official evaluation.
+Label 2 of O1 ("other pathology") is removed from every segmentation first, as in the official
+evaluation.
 """
 
 from __future__ import annotations

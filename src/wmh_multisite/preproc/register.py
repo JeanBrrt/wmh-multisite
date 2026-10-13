@@ -1,25 +1,19 @@
-"""Rigid registration of the raw 3D T1 to the raw FLAIR (ROADMAP step 3.2).
+"""Rigid registration of the raw 3D T1 to the raw FLAIR.
 
-Pipeline order (J-036): HD-BET brain mask on the raw T1 (3.3) -> **this step** -> brain mask carried
-onto the FLAIR grid (3.3) -> N4 with the brain masks, then N4 T1 resampled onto the FLAIR grid (3.1).
-Registering the *raw* images makes the transform independent of the bias correction, so that N4 can
-use a brain mask defined on the FLAIR grid. Mutual information is robust to the smooth bias field
-(raw images registered at 0.98-0.99 against elastix in the feasibility test, J-016).
+Preprocessing order: HD-BET mask on the raw T1 -> this registration -> mask carried onto the FLAIR
+grid -> N4 with the brain masks -> N4 T1 resampled onto the FLAIR grid. Registering the raw images
+keeps the transform independent of N4; mutual information copes with the smooth bias field.
 
-The 3D T1 (moving, 1 mm) is registered to the FLAIR (fixed) with a rigid transform (3 rotations +
-3 translations: same subject, same session, the head only moved) and Mattes mutual information (the
-two contrasts differ). The FLAIR is never resampled (it is the evaluation grid, J-010).
+Rigid transform (same subject and session, only the head moved) with Mattes mutual information (the
+contrasts differ). The FLAIR is never resampled: it is the evaluation grid.
 
-Quality control against the organizers' elastix registration (J-016, J-031):
-- the transform is applied to the raw T1 and correlated with ``orig/T1`` (raw T1 aligned by elastix);
-- the displacement between our transform and elastix's is measured over the head (mean and max, mm),
-  together with the angle of the relative rotation.
+QC against the organizers' elastix registration: correlation of our registered T1 with ``orig/T1``,
+and displacement (mean, max, mm) and relative rotation between the two transforms over the head.
+Subjects listed in ``preproc.rigid.use_elastix`` (sub-146) take the elastix transform instead; the
+ANTs one is kept as ``..._desc-ants_xfm.mat``.
 
-Documented exception: subjects listed in ``preproc.rigid.use_elastix`` (sub-146, J-039) use the
-organizers' elastix transform; the ANTs transform is kept as ``..._desc-ants_xfm.mat``.
-
-Output, in ``data/derivatives/wmh-multisite/sub-XXX/anat/``:
-    sub-XXX_from-T1w_to-FLAIR_mode-image_xfm.mat    rigid transform (ITK format)
+Output: ``sub-XXX_from-T1w_to-FLAIR_mode-image_xfm.mat`` (ITK format) in
+``data/derivatives/wmh-multisite/sub-XXX/anat/``.
 
 Usage:
     uv run python -m wmh_multisite.preproc.register --split training --jobs 4
@@ -52,11 +46,10 @@ log = logging.getLogger(__name__)
 
 
 def remove_registration_files(reg: dict[str, Any]) -> int:
-    """Delete the transform files ``ants.registration`` left in the temporary folder (after copying them).
+    """Delete the transform files ANTsPy leaves in the system temp folder (once copied).
 
-    ANTsPy writes every transform to the system temporary folder and never removes it: 807 files (5.4 GB)
-    had accumulated after the registrations of 3.2, 3.6 and 7.5 and filled the disk (2026-10-06). Only files
-    located in the temporary folder are removed.
+    ANTsPy never cleans them up; 5.4 GB had piled up and filled the disk. Only files sitting directly
+    in the temp folder are removed.
     """
     import tempfile
 
@@ -84,11 +77,9 @@ def subject_paths(cfg: dict[str, Any], sub: str) -> dict[str, Path]:
 
 
 def resample_onto_flair(flair: Path, moving: Path, xfm: Path, out: Path, labels: bool = False) -> Path:
-    """Resample a T1-grid image onto the FLAIR grid with the rigid transform.
+    """Resample a T1-grid image onto the FLAIR grid: linear for images, ``genericLabel`` for masks.
 
-    Images: linear interpolation (as the organizers, J-031). Masks: ``genericLabel`` (never linear for
-    labels, notebook 01). ANTs and nibabel arrays share the voxel order of the file, so the result is
-    saved with the FLAIR geometry by ``io.save_like``.
+    ANTs and nibabel arrays share the file's voxel order, so ``io.save_like`` can reuse the FLAIR header.
     """
     fixed = ants.image_read(str(flair))
     result = ants.apply_transforms(
@@ -105,7 +96,7 @@ def resample_onto_flair(flair: Path, moving: Path, xfm: Path, out: Path, labels:
 
 
 def elastix_euler(param_file: Path) -> sitk.Euler3DTransform:
-    """Rebuild the organizers' rigid transform from its elastix parameter file (notebook 02, section 4).
+    """Rebuild the organizers' rigid transform from its elastix parameter file.
 
     Like an ANTs forward transform, it maps a point of the FLAIR (fixed) space to the T1 (moving)
     space, in LPS millimeters.
@@ -169,8 +160,8 @@ def register_subject(sub: str, config_path: str | None = None) -> dict[str, Any]
     moving = ants.image_read(str(p["t1_raw"]), pixeltype="float")
     t0 = time.time()
     if sub in rigid.get("use_elastix", []):
-        # Documented exception (J-039): ANTs is unreliable on this subject's atypical FLAIR; use the
-        # organizers' elastix transform, converted to an ITK file that ANTs applies like its own.
+        # ANTs is unreliable on this subject's atypical FLAIR: take the organizers' elastix transform,
+        # written as an ITK file that ANTs applies like its own.
         if not p["xfm"].is_file() or sitk.ReadTransform(str(p["xfm"])).GetName() != "Euler3DTransform":
             if p["xfm"].is_file():
                 ants_copy = p["xfm"].with_name(p["xfm"].name.replace("_xfm.mat", "_desc-ants_xfm.mat"))

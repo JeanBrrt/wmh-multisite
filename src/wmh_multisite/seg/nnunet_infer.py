@@ -1,4 +1,4 @@
-"""nnU-Net inference on the local GPU (ROADMAP step 5.3).
+"""nnU-Net inference on the local GPU.
 
 The trained model (``data/nnunet/nnUNet_results/...``, downloaded from Kaggle) is applied to the
 preprocessed images of each subject: FLAIR N4 (channel 0) and T1 N4 on the FLAIR grid (channel 1),
@@ -7,7 +7,7 @@ read directly from the derivatives. Predictions are written on the FLAIR grid, a
     data/derivatives/wmh-multisite/sub-XXX/anat/sub-XXX_space-FLAIR_desc-<model>_dseg.nii.gz   (0 / 1)
 
 Each batch runs ``nnunet_infer_worker.py`` in the temporary CUDA environment (the project's PyTorch is
-CPU-only), under the memory watchdog, with a hard cap on GPU memory (as HD-BET, J-033). Subjects
+CPU-only), under the memory watchdog, with a hard cap on GPU memory, like HD-BET. Subjects
 already predicted are skipped; every prediction is checked (FLAIR grid, labels 0/1) before it is kept.
 
 Usage:
@@ -153,8 +153,8 @@ def challenge_inputs(cfg: dict[str, Any], sub: str) -> tuple[Path, Path]:
 
 
 def run(cfg: dict[str, Any], subjects: list[str], model: str, inputs: str = "ours") -> pd.DataFrame:
-    """``inputs="ours"``: our preprocessing (5.3), predictions ``desc-<model>``; ``inputs="challenge"``:
-    the organizers' ``pre/`` images (preprocessing experiment, J-010), predictions ``desc-<model>pre``."""
+    """``inputs="ours"``: our preprocessing, predictions ``desc-<model>``; ``inputs="challenge"``:
+    the organizers' ``pre/`` images (preprocessing experiment), predictions ``desc-<model>pre``."""
     cases = []
     for s in subjects:
         p = paths(cfg, s, model)

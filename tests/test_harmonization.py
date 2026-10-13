@@ -1,4 +1,4 @@
-"""Phase 8 (8.2, 8.3): NAWM features, site classifier and ComBat on simulated multi-site data."""
+"""Harmonisation: NAWM features, site classifier and ComBat on simulated multi-site data."""
 
 import numpy as np
 import pandas as pd

@@ -1,12 +1,11 @@
-"""Periventricular vs deep WMH (ROADMAP step 7.2, J-050).
+"""Periventricular vs deep WMH.
 
-The clinical scales (Fazekas) score periventricular and deep WMH separately: the same total load can be
-mostly around the ventricles or scattered in the deep white matter. Rule used here, the most common in
-automated studies: **a WMH voxel is periventricular if it lies within ``periventricular_distance_mm``
-(10 mm) of the lateral ventricles, deep otherwise** (voxel-wise: a confluent plaque that starts at the
-ventricle and extends far is split between the two).
+Clinical scales (Fazekas) score the two separately: the same load can sit around the ventricles or be
+scattered in the deep white matter. Rule, the most common in automated studies: a WMH voxel within
+``periventricular_distance_mm`` (10 mm) of the lateral ventricles is periventricular, otherwise deep.
+It is voxel-wise, so a confluent plaque reaching far from the ventricle is split between the two.
 
-    WMH mask (any source)          lateral ventricles (WMH-SynthSeg labels 4 + 43, J-045; atlas C as fallback)
+    WMH mask (any source)          lateral ventricles (WMH-SynthSeg labels 4 + 43, else the atlas ones)
           |                                      |
           |                       distance (mm) of every voxel to the nearest ventricle voxel,
           |                       with the real voxel size (3 mm slices: counting voxels would make
@@ -14,10 +13,9 @@ ventricle and extends far is split between the two).
           v                                      v
     periventricular = WMH & distance <= 10 mm ;  deep = WMH & distance > 10 mm
 
-The ventricles depend on the subject only, not on the WMH source: every source of a subject is split
-with the same ventricle mask, so that the comparison between sources measures the WMH, not the
-ventricles. Ventricles that swallow lesions would bias the split: WMH-SynthSeg gives the WMH their own
-label (checked on the 5 CHECK subjects: no WMH voxel inside its ventricles).
+All sources of a subject share the same ventricle mask, so comparing sources compares the WMH, not
+the ventricles. WMH-SynthSeg gives the WMH their own label, so its ventricles do not swallow lesions
+(checked on 5 subjects).
 """
 
 from __future__ import annotations

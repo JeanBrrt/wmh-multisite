@@ -1,26 +1,24 @@
-"""Does the QC detector catch degraded images? Simulated artifacts (ROADMAP step 4.3, J-051).
+"""Does the QC detector catch degraded images? Simulated artifacts.
 
-The challenge images were selected by the organizers: few, if any, are really bad. To check that the
-detector of 4.2 works, degraded images are **made**: clean raw images (class "usable") receive realistic
-artifacts with TorchIO at increasing intensity, their IQMs are recomputed and judged by the detector
-fitted on the real images. One modality at a time (``--modality``): the FLAIR (our adaptation of MRIQC,
-J-051) and the T1 (J-060: where the CJV, MRIQC's motion-sensitive metric, is judged).
+The organizers picked the challenge images, so few if any are really bad. To test the detector of
+``qc.outliers`` we make bad ones: clean raw images get TorchIO artifacts of increasing strength, their
+IQMs are recomputed and judged by the detector fitted on the real images. One modality at a time
+(``--modality``): the FLAIR, and the T1, where CJV (MRIQC's motion-sensitive metric) is judged.
 
     clean raw images of one modality (``n_per_scanner`` usable subjects per scanner)
       x artifact (noise, motion, bias field, ghosting) x level (0 = none ... 4 = strong, ``qc.artifacts``)
           image / brain median -> TorchIO transform (fixed seed) -> x brain median
-      -> N4 on the degraded image (same settings as 3.1), as a real image would get
-      -> IQMs (4.1, MRIQC protocol; same masks: the artifacts do not move the anatomy, except motion slightly)
-      -> z against the CLEAN images of the same scanner, Isolation Forest fitted on the clean images (4.2)
+      -> N4 on the degraded image (same settings as the pipeline), as a real image would get
+      -> IQMs (MRIQC protocol; same masks: the artifacts do not move the anatomy, except motion slightly)
+      -> z against the CLEAN images of the same scanner, Isolation Forest fitted on the clean images
       -> class; detection rate = share of images not "usable", per artifact and level
       v
     results/tables/qc_artifacts.csv, results/figures/qc_artifact_detection.png
 
-Level 0 gives the false-alarm rate on unmodified images. A simulated bias field is seen by
-``inu_range`` (N4 estimates it), not by the tissue metrics, which are measured after N4 as in MRIQC.
-Only one modality is degraded: the metrics of the other one are those of the real image. The regions
-(HD-BET brain, rigid transform, WMH-SynthSeg tissues) are those of the clean image: the experiment tests
-the metrics, not HD-BET, the registration or the segmentation on degraded images.
+Level 0 gives the false-alarm rate. A simulated bias shows in ``inu_range`` (N4 estimates it), not in
+the tissue metrics, which are measured after N4 as in MRIQC. The other modality keeps its real IQMs,
+and the regions (brain, tissues, transform) are those of the clean image: this tests the metrics, not
+HD-BET, the registration or the segmentation on degraded images.
 
 Usage:
     uv run python -m wmh_multisite.qc.artifacts                    # FLAIR -> qc_artifacts.csv
@@ -79,7 +77,7 @@ def degrade(
 
 
 def n4_field(image: np.ndarray, brain: np.ndarray, reference: Path) -> np.ndarray:
-    """N4 field of an in-memory image, with the settings and the code of preproc 3.1."""
+    """N4 field of an in-memory image, with the same code and settings as ``preproc.bias``."""
     from wmh_multisite.preproc.bias import n4_correct
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -102,7 +100,7 @@ def badness(rows: pd.DataFrame, clean: pd.DataFrame, modality: str) -> pd.DataFr
 
 
 def images(cfg: dict[str, Any], sub: str, modality: str) -> dict[str, Any]:
-    """Raw image, brain, tissue labels and voxel size of one modality, on its own grid (as in 4.1)."""
+    """Raw image, brain, tissue labels and voxel size of one modality, on its own grid (as in ``qc.iqm``)."""
     p = subject_paths(cfg, sub)
     nii = io.load(p[modality])
     if modality == "FLAIR":
@@ -205,7 +203,7 @@ def detection_figure(table: pd.DataFrame, path, modality: str = "FLAIR") -> None
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Detection of simulated artifacts by the QC (4.3).")
+    parser = argparse.ArgumentParser(description="Detection of simulated artifacts by the QC.")
     parser.add_argument("--config")
     parser.add_argument("--modality", choices=["FLAIR", "T1w"], default="FLAIR")
     args = parser.parse_args(argv)
@@ -215,7 +213,7 @@ def main(argv: list[str] | None = None) -> None:
     if table.empty:
         return
     results = resolve_path(cfg, "results")
-    suffix = "" if args.modality == "FLAIR" else f"_{args.modality}"  # FLAIR keeps the J-051 file names
+    suffix = "" if args.modality == "FLAIR" else f"_{args.modality}"  # FLAIR keeps the original file names
     table.to_csv(results / "tables" / f"qc_artifacts{suffix}.csv", index=False, float_format="%.5g")
     (results / "figures").mkdir(exist_ok=True)
     detection_figure(table, results / "figures" / f"qc_artifact_detection{suffix}.png", args.modality)

@@ -1,4 +1,4 @@
-"""Agreement statistics of 7.4 on small tables whose answer is known in advance."""
+"""Agreement statistics on small tables whose answer is known in advance."""
 
 import numpy as np
 import pandas as pd

@@ -1,13 +1,12 @@
-r"""FLAIR thresholding, method M3 (ROADMAP step 5.5, J-009, J-013, J-028, J-044).
+r"""FLAIR thresholding, method M3: the classical baseline.
 
-Why: M3 is the *classical* baseline. White matter hyperintensities are, by definition, bright on
-FLAIR, so the simplest segmentation is "the voxels brighter than a threshold". Its performance tells
-how much the learnt methods (M1 nnU-Net, M2 WMH-SynthSeg) bring, and how sensitive a fixed intensity
-rule is to the scanner.
+WMH are bright on FLAIR by definition, so the simplest segmentation keeps the voxels above a
+threshold. It shows what the learnt methods (M1 nnU-Net, M2 WMH-SynthSeg) add, and how much a fixed
+intensity rule depends on the scanner.
 
     FLAIR N4 (FLAIR grid) + HD-BET brain mask (FLAIR grid)
        |
-       |  1. z-score inside the brain (median, MAD)          rule A of J-028
+       |  1. z-score inside the brain (median, MAD)
        v
     z map ----- 2. z > t ----------------------------\
        |                                               \
@@ -18,20 +17,16 @@ rule is to the scanner.
                                                          v
                                         sub-XXX_space-FLAIR_desc-threshold_dseg.nii.gz
 
-1. **Normalisation inside the brain** (J-028, rule A): z = (FLAIR - median) / (1.4826 x MAD), both
-   computed on the HD-BET brain voxels only. Median and MAD are robust: the bright lesions (a few % of
-   the brain) barely move them, unlike a mean and a standard deviation. Same scale for every scanner.
-2. **Threshold t** on z.
-3. **Minimum depth e**: voxels closer than ``e`` mm to the brain border are excluded. The border holds
-   bright non-lesion voxels (cortex, residual meninges or vessels left by the mask, partial volume),
-   while WMH lie in the white matter, deeper (training set: 5th percentile of lesion depth 16 mm).
-4. **Minimum size m**: isolated bright specks (noise, vessels) smaller than ``m`` mm3 are removed
-   (26-connectivity). In mm3 so that the rule means the same on 3 mm 2D FLAIRs and 3D FLAIRs.
+1. z = (FLAIR - median) / (1.4826 x MAD) over the brain voxels only. Unlike mean and SD, median and
+   MAD barely move with the bright lesions, and the scale is the same on every scanner.
+2. Threshold t on z.
+3. Minimum depth e (mm to the brain border): the border is full of bright non-lesion voxels (cortex,
+   leftover meninges or vessels, partial volume), while WMH sit deeper (5th percentile: 16 mm).
+4. Minimum size m, in mm3 so that it means the same on 3 mm 2D and 3D FLAIRs (26-connectivity).
 
-**Tuning (J-013).** One global (t, e, m) chosen by grid search on the 60 training subjects, maximising
-the mean Dice per subject (label 2 "other pathology" ignored, as in the official evaluation). Nothing
-is tuned on the test set. The best threshold *per scanner* is also reported, for information only (it
-measures how scanner-dependent the rule is), never used.
+One global (t, e, m) is chosen by grid search on the 60 training subjects, maximising the mean Dice
+(label 2 ignored, as in the official evaluation). The best threshold per scanner is reported to show
+how scanner-dependent the rule is, but never used.
 
 Outputs:
     results/tables/threshold_tuning.csv        mean Dice of every (t, e, m), overall and per scanner
@@ -69,7 +64,7 @@ MODEL = "threshold"
 
 
 def model_name(normalization: str) -> str:
-    """BIDS desc of the predictions: ``threshold`` for the robust z (5.5), ``threshold<method>`` (8.4)."""
+    """BIDS desc of the predictions: ``threshold`` for the robust z, ``threshold<method>`` otherwise."""
     return MODEL if normalization == "zscore" else f"{MODEL}{normalization}"
 
 
@@ -81,7 +76,7 @@ STRUCTURE = np.ones((3, 3, 3), bool)  # 26-connectivity
 
 
 def zscore_in_brain(flair: np.ndarray, brain: np.ndarray) -> np.ndarray:
-    """Robust z-score with statistics taken inside the brain only (J-028, rule A)."""
+    """Robust z-score with statistics taken inside the brain only."""
     values = flair[brain]
     median = float(np.median(values))
     mad = float(np.median(np.abs(values - median))) * 1.4826  # = standard deviation for a Gaussian
@@ -139,7 +134,7 @@ def prepare(
 ) -> tuple[np.ndarray, np.ndarray, float, tuple[slice, ...]]:
     """Normalised FLAIR and depth map cropped to the brain bounding box (faster grid search), voxel volume.
 
-    ``normalization``: ``zscore`` (5.5) or another method of ``harmonize.intensity`` (8.4).
+    ``normalization``: ``zscore`` or another method of ``harmonize.intensity``.
     """
     brain = io.load_labels(p["brain"], allowed=(0, 1)).astype(bool)
     flair = io.load_data(p["flair_n4"])
@@ -201,7 +196,7 @@ def _grid(cfg: dict[str, Any], normalization: str = "zscore") -> dict[str, list[
 
 
 def fit_normalization(cfg: dict[str, Any], subjects: list[str], normalization: str) -> dict[str, Any]:
-    """Normalisation parameters learnt on the training subjects (J-013), inside the brain (J-028, rule A)."""
+    """Normalisation parameters learnt inside the brain of the training subjects."""
     if normalization not in ("none", "histmatch"):
         return {}
     pairs = []
@@ -214,7 +209,7 @@ def fit_normalization(cfg: dict[str, Any], subjects: list[str], normalization: s
 def tune(
     cfg: dict[str, Any], jobs: int, config_path: str | None = None, normalization: str = "zscore"
 ) -> dict[str, Any]:
-    """Grid search on the training subjects (J-013); writes the tuning table and the chosen params."""
+    """Grid search on the training subjects; writes the tuning table and the chosen params."""
     part = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t")
     train = part[part.split == "training"]
     grid = _grid(cfg, normalization)
@@ -308,7 +303,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--split", choices=["training", "test", "all"], default="all")
     parser.add_argument("--jobs", type=int)
     parser.add_argument(
-        "--normalization", choices=intensity.METHODS, default="zscore", help="FLAIR normalisation (8.4)"
+        "--normalization", choices=intensity.METHODS, default="zscore", help="FLAIR normalisation"
     )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)

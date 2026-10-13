@@ -1,4 +1,4 @@
-"""Export of the preprocessed images to the nnU-Net v2 dataset format (ROADMAP step 5.1).
+"""Export of the preprocessed images to the nnU-Net v2 dataset format.
 
 nnU-Net v2 expects (documentation: "dataset_format.md"):
 
@@ -15,7 +15,7 @@ nnU-Net v2 expects (documentation: "dataset_format.md"):
   requires the ignore label to be the highest one, which is the case.
 - Normalization is left to nnU-Net (z-score per image for MRI channels).
 - ``splits_final.json``: 5 cross-validation folds stratified by scanner, so that every validation fold
-  has the same number of subjects from each site (J-032). nnU-Net uses this file if it finds it in
+  has the same number of subjects from each site. nnU-Net uses this file if it finds it in
   ``nnUNet_preprocessed/Dataset001_WMH/``; the Kaggle notebook copies it there.
 
 Images are hard links to the derivatives (no extra disk space); labels are rewritten as uint8.

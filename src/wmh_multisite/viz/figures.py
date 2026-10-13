@@ -1,10 +1,10 @@
-"""Summary figures of the evaluation (ROADMAP step 6.4, J-060).
+"""Summary figures of the evaluation.
 
     results/figures/
-      dice_by_method_and_scanner.png   mean Dice and bootstrap 95 % CI (6.2) per method and scanner
+      dice_by_method_and_scanner.png   mean Dice and bootstrap 95 % CI per method and scanner
       seen_vs_unseen.png               Dice and HD95, scanners seen vs unseen in training, with CIs
-      leaderboard.png                  official overall rank score of the 57 published teams + ours (6.4)
-      human_ceiling.png                inter-observer agreement (6.3) next to the methods
+      leaderboard.png                  official overall rank score of the 57 published teams + ours
+      human_ceiling.png                inter-observer agreement next to the methods
     results/tables/leaderboard_positions.csv
 
 Only aggregated numbers are drawn (no patient image).
@@ -152,7 +152,7 @@ def human_ceiling(inter: pd.DataFrame, ci: pd.DataFrame, path: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Summary figures (6.4).")
+    parser = argparse.ArgumentParser(description="Summary figures.")
     parser.add_argument("--config")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)

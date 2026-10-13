@@ -1,4 +1,4 @@
-"""Lesion maps in MNI space (7.5): transport plumbing with identity transforms, map agreement."""
+"""Lesion maps in MNI space: transport plumbing with identity transforms, map agreement."""
 
 import numpy as np
 import pandas as pd

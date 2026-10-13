@@ -1,6 +1,6 @@
 """nnU-Net inference worker, run on the local GPU in a temporary uv environment (CUDA PyTorch + nnU-Net).
 
-Executed **by path** (not imported): it only imports the standard library, torch and nnunetv2, never
+Executed by path (not imported): it only imports the standard library, torch and nnunetv2, never
 ``wmh_multisite``. Launched by ``seg/nnunet_infer.py`` under the memory watchdog.
 
 The model was trained with a custom trainer (``nnUNetTrainerWMH_250``, defined on Kaggle only: same
@@ -27,7 +27,7 @@ import torch
 def main(job_file: str) -> None:
     job = json.load(open(job_file))
     total_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
-    # Hard cap: a clean out-of-memory error instead of a spill into Windows shared memory (J-005).
+    # Hard cap: a clean OOM error instead of a spill into Windows shared memory.
     torch.cuda.set_per_process_memory_fraction(min(job["vram_cap_gb"] / total_gb, 0.95), 0)
 
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
@@ -71,7 +71,7 @@ def main(job_file: str) -> None:
         checkpoint.get("inference_allowed_mirroring_axes"),
     )
     t0 = time.time()
-    # 1 preprocessing and 1 export process keep the RAM low (same reasoning as HD-BET, J-033).
+    # 1 preprocessing and 1 export process keep the RAM low, as for HD-BET.
     predictor.predict_from_files(
         [[flair, t1] for flair, t1, _ in job["cases"]],
         [out for _, _, out in job["cases"]],

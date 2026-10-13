@@ -1,4 +1,4 @@
-"""Statistics of 6.2 on small tables whose answer is known in advance."""
+"""Test-set statistics on small tables whose answer is known in advance."""
 
 import numpy as np
 import pandas as pd

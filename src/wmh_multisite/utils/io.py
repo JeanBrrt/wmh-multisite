@@ -1,6 +1,6 @@
 """NIfTI input/output: the only way the pipeline reads and writes images.
 
-Why this module exists (see notebooks/01_explore_nifti.ipynb):
+Pitfalls it guards against:
 - an array without its affine is meaningless: saving with the wrong affine moves the image silently;
 - two arrays with the same shape are not necessarily on the same grid;
 - ``get_fdata()`` returns float64 by default (4x the disk size of uint16 data);
@@ -143,7 +143,7 @@ def voxel_volume_mm3(img: ImageLike) -> float:
 
 
 def describe(img: ImageLike, with_stats: bool = False) -> dict[str, Any]:
-    """Summarize an image for QC tables (used by the BIDS conversion, step 2.2).
+    """Summarize an image for QC tables (used by the BIDS conversion).
 
     Keys: shape, voxel_size_mm, axcodes, dtype_on_disk, qform_code, sform_code, qform_sform_agree
     (None when fewer than two of the forms are valid). With ``with_stats``: min, p1, p50, p99,

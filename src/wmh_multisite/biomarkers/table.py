@@ -1,16 +1,13 @@
-"""Biomarker table: volumes (7.1), location (7.2), lesion structure (7.3) per subject and source.
-
-J-048, J-050.
+"""Biomarker table: volumes, location and lesion structure per subject and source.
 
     test (110)        : O1 (manual reference) + every model with predictions (M1 nnU-Net, M3 threshold,
                         then M2 WMH-SynthSeg and DA5)
-    training (60)     : O1, O3, O4 (three experts: the human spread of the biomarkers, needed in 7.4)
+    training (60)     : O1, O3, O4 (three experts: the human spread of the biomarkers)
                         + M1 on the 12 fold-0 validation subjects (held out from that model)
         |
-        |  label 2 of O1 removed from every mask; HD-BET brain mask for the fraction (J-028, rule A);
-        |  lateral ventricles of the subject (first available of ``biomarkers.ventricles``: WMH-SynthSeg,
-        |  then the atlas refinement C) for the periventricular / deep split (``ventricle_source`` column;
-        |  NaN if the subject has no ventricle mask yet)
+        |  label 2 of O1 removed from every mask; HD-BET brain mask for the fraction;
+        |  ventricles = first available of ``biomarkers.ventricles`` (WMH-SynthSeg, then the atlas),
+        |  recorded in ``ventricle_source`` (NaN if the subject has none yet)
         v
     results/tables/biomarkers.csv   one row per (subject, source)
 
@@ -18,7 +15,7 @@ Training-set predictions of M1 (other than the 12 held-out subjects) and of M3 (
 set) are not used: they would be optimistic.
 
 Check: on the test set, the WMH volumes must equal ``true_ml`` / ``pred_ml`` of the official evaluation
-tables of 6.1 (same label-2 removal); the largest difference is logged.
+tables; the largest difference is logged.
 
 Usage:
     uv run python -m wmh_multisite.biomarkers.table
@@ -194,7 +191,7 @@ def check_against_evaluation(cfg: dict[str, Any], table: pd.DataFrame) -> dict[s
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="WMH volumes (7.1) and lesion structure (7.3).")
+    parser = argparse.ArgumentParser(description="WMH volumes, location and lesion structure.")
     parser.add_argument("--config")
     parser.add_argument("--jobs", type=int, default=4)
     args = parser.parse_args(argv)

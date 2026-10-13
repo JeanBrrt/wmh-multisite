@@ -1,14 +1,12 @@
-"""Position of our methods on the official WMH challenge leaderboard (ROADMAP step 6.4, J-042, J-060).
+"""Position of our methods on the official WMH challenge leaderboard.
 
-Source: the leaderboard of the challenge (57 teams, up to date in December 2022), page 20 of the
-official ``readme.pdf`` of the dataset (DataverseNL), stored in ``results/tables/leaderboard_wmh2017.csv``
-(values rounded to 2 decimals in the source).
+Source: the 57-team leaderboard (December 2022) on page 20 of the dataset's ``readme.pdf``
+(DataverseNL), copied to ``results/tables/leaderboard_wmh2017.csv`` (rounded to 2 decimals there).
 
-Official ranking (``readme.pdf``, page 23): each metric is averaged over the test scans; for each metric
-the best team gets 0, the worst 1, the others linearly in between; the overall rank is the mean of
-the five metric ranks (Dice, HD95, AVD, lesion recall, lesion F1). Adding a team can change the best or
-worst value of a metric, hence every team's score: each of our methods is inserted **alone** among
-the 57 teams and ranked with the same formula.
+Official ranking (``readme.pdf``, page 23): for each metric averaged over the test scans, the best team
+gets 0, the worst 1, the others linearly in between; the overall rank is the mean over the five
+metrics. A new team can move the best or worst value and so every score, hence each of our methods is
+inserted alone among the 57 teams.
 """
 
 from __future__ import annotations

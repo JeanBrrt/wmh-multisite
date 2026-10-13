@@ -1,4 +1,4 @@
-"""Official evaluation of the MICCAI WMH Segmentation Challenge, vendored verbatim (J-012).
+"""Official evaluation of the MICCAI WMH Segmentation Challenge, vendored verbatim.
 
 Source: https://github.com/hjkuijf/wmhchallenge, file ``evaluation.py``, commit
 2e628cbe5a2da37d9be24d455fdaee7438adf9c5 (fetched 2026-10-04). The functions are kept as published

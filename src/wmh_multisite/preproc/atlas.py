@@ -1,40 +1,33 @@
-"""Registration to the MNI atlas and lateral ventricles of each subject (ROADMAP step 3.6, J-041).
+"""Registration to the MNI atlas, and lateral ventricles of each subject.
 
-Why: step 7.2 splits the WMH into *periventricular* and *deep* lesions by their distance to the
-lateral ventricles, and step 7.5 maps all lesions into a common space. Both need each brain registered
-to an atlas.
+The periventricular / deep split of the WMH needs the ventricles, and the lesion maps need a common
+space; both come from this registration.
 
     TemplateFlow MNI152NLin2009cAsym (1 mm):  T1 template + brain mask + Harvard-Oxford labels
               ^
               |  A. SyN (rigid + affine + non-linear), brain to brain: subject T1 N4 -> template T1
               |
-    subject T1 N4 (1 mm) ----- rigid (3.2) -----> subject FLAIR grid
+    subject T1 N4 (1 mm) ----- rigid -----> subject FLAIR grid
 
-    B. atlas ventricles -> subject T1 grid (inverse of A) -> FLAIR grid (rigid of 3.2), genericLabel
+    B. atlas ventricles -> subject T1 grid (inverse of A) -> FLAIR grid (rigid), genericLabel
     C. refinement on the FLAIR: dark voxels (subject-specific threshold) connected to the atlas
        ventricles, within a band around them (the atlas under-estimates enlarged, atrophic ventricles)
 
-A. **Brain to brain.** The subject T1 (N4, HD-BET mask) is registered to the template T1 restricted to
-   the template brain mask: skull, scalp and neck vary between people and are not in the atlas.
-   ANTs ``SyN`` chains rigid, affine and a smooth invertible deformation (Mattes mutual information,
-   update field smoothed by a Gaussian of 3 voxels). One thread and a fixed seed (J-031).
-B. **Atlas labels to the subject**, in two resamplings that use ANTs' documented conventions instead
-   of a hand-made composition: ``invtransforms`` (template -> subject T1 grid), then the rigid
-   transform (T1 grid -> FLAIR grid, ``register.resample_onto_flair``). Labels are always resampled
-   with ``genericLabel`` (never linear).
-C. **Refinement.** Threshold specific to each subject, learnt on its own FLAIR, inside the brain
-   (J-028, rule A): halfway between the median of the atlas-ventricle *core* (eroded by ``core_mm``:
-   certainly CSF) and the median of the brain tissue far from the ventricles (``tissue_min_mm``; the
-   median is robust to the few bright lesions, and no manual label is used, J-013). Dark voxels within
-   ``zone_mm`` of the atlas ventricles that are connected to them form the refined ventricles; the band
-   prevents a leak into the sulcal CSF.
+A. Brain to brain: skull, scalp and neck vary between people and are not in the atlas. ANTs ``SyN``
+   with Mattes mutual information, one thread and a fixed seed.
+B. Two resamplings with ANTs' own conventions rather than a hand-made composition: ``invtransforms``
+   (template -> T1 grid), then ``register.resample_onto_flair`` (T1 -> FLAIR grid).
+C. The threshold sits halfway between the median FLAIR of the atlas-ventricle core (eroded by
+   ``core_mm``, surely CSF) and that of the tissue far from the ventricles (``tissue_min_mm``). Medians
+   barely move with the few bright lesions, and no manual label is used. Dark voxels within ``zone_mm``
+   and connected to the atlas ventricles form the refined mask; the band stops leaks into sulcal CSF.
 
 Outputs, in ``data/derivatives/wmh-multisite/sub-XXX/anat/``:
     sub-XXX_from-T1w_to-MNI152NLin2009cAsym_mode-image_desc-affine_xfm.mat
     sub-XXX_from-T1w_to-MNI152NLin2009cAsym_mode-image_desc-warp_xfm.nii.gz      (and desc-invwarp)
     sub-XXX_space-T1w_desc-ventriclesatlas_mask.nii.gz       atlas ventricles, T1 grid
     sub-XXX_space-FLAIR_desc-ventriclesatlas_mask.nii.gz     atlas ventricles, FLAIR grid
-    sub-XXX_space-FLAIR_desc-ventricles_mask.nii.gz          refined ventricles, FLAIR grid (used in 7.2)
+    sub-XXX_space-FLAIR_desc-ventricles_mask.nii.gz          refined ventricles, FLAIR grid
 and ``results/tables/atlas_qc.csv``.
 
 Usage:
@@ -134,7 +127,7 @@ def register_to_template(cfg: dict[str, Any], p: dict[str, Path], tpl: dict[str,
 
 
 def ventricles_to_flair(cfg: dict[str, Any], p: dict[str, Path], tpl: dict[str, Path]) -> None:
-    """Step B. Atlas ventricles -> subject T1 grid (inverse of A) -> FLAIR grid (rigid of 3.2)."""
+    """Step B. Atlas ventricles -> subject T1 grid (inverse of A) -> FLAIR grid (rigid)."""
     labels = ants.image_read(str(tpl["labels"]))
     vent = labels.new_image_like(
         np.isin(labels.numpy(), cfg["preproc"]["atlas"]["ventricle_labels"]).astype("float32")

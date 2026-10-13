@@ -1,10 +1,9 @@
-"""Uncertainty and comparisons on the test-set metrics (ROADMAP step 6.2, J-047).
+"""Uncertainty and comparisons on the test-set metrics.
 
-Why: a mean alone does not say whether a gap is real or due to which subjects happened to be in the
-test set (10 to 30 per scanner). Every mean gets a 95 % confidence interval, and every comparison a
-test.
+With 10 to 30 test subjects per scanner, a gap between means may just reflect which subjects were
+drawn. Every mean gets a 95 % confidence interval, and every comparison a test.
 
-    results/tables/evaluation_<model>.csv  (one row per test subject and model, from 6.1)
+    results/tables/evaluation_<model>.csv  (one row per test subject and model)
         |
         |-- 1. mean + bootstrap CI     per model x group (all, each scanner, seen / unseen) x metric
         |-- 2. paired comparisons      per pair of models x metric: same subjects, per-subject differences
@@ -12,19 +11,14 @@ test.
         v
     results/tables/stats_ci.csv, stats_paired.csv, stats_seen_unseen.csv
 
-1. **Bootstrap, percentile, stratified by scanner.** The distribution of a Dice is bounded and skewed,
-   so no closed formula applies. The subjects are resampled with replacement ``bootstrap_samples``
-   times, the mean is recomputed each time, and the CI is given by the percentiles of these means.
-   Resampling is done *within each scanner* (same number of subjects per scanner as the real test set),
-   so that a resample cannot change the scanner mix and move the mean for that reason alone.
-2. **Paired comparisons.** All models are scored on the same subjects: the per-subject difference
-   removes the difficulty of each subject. Wilcoxon signed-rank test (no normality assumption, robust to
-   extreme cases) and bootstrap CI of the mean difference. Holm correction over all the paired tests
-   (several pairs x 5 metrics), which controls the probability of at least one false positive.
-3. **Seen vs unseen scanners.** Different subjects (90 vs 20): unpaired. Difference of means
-   (unseen - seen) with a bootstrap CI (each group resampled on its own, stratified by scanner) and a
-   Mann-Whitney U test. Caveat: the 20 unseen subjects come from 2 scanners, and a gap may reflect the
-   population as much as the scanner (no demographics, J-004).
+1. Percentile bootstrap: Dice is bounded and skewed, so no closed formula. Resampling is done within
+   each scanner, so a resample cannot change the scanner mix and move the mean for that reason alone.
+2. Paired comparisons: every model is scored on the same subjects, so per-subject differences cancel
+   each subject's difficulty. Wilcoxon signed-rank test and bootstrap CI of the mean difference, Holm
+   correction over all the paired tests.
+3. Seen vs unseen scanners: different subjects (90 vs 20), so unpaired. Bootstrap CI of the difference
+   and Mann-Whitney U. The 20 unseen subjects come from 2 scanners, and without demographics a gap may
+   reflect the population as much as the scanner.
 
 HD95 is undefined (NaN) when a method predicts nothing: such subjects are left out of that metric only
 (as on the leaderboard) and counted in ``n_missing``.
@@ -179,7 +173,7 @@ def seen_unseen_table(table: pd.DataFrame, n_boot: int, level: float, seed: int)
 
 
 def load_evaluations(cfg: dict[str, Any]) -> pd.DataFrame:
-    """All ``evaluation_<model>.csv`` tables of 6.1 (summaries excluded), test split only."""
+    """All ``evaluation_<model>.csv`` tables (summaries excluded), test split only."""
     files = sorted(
         f
         for f in (resolve_path(cfg, "results") / "tables").glob("evaluation_*.csv")

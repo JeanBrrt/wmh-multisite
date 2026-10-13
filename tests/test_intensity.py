@@ -1,4 +1,4 @@
-"""Intensity normalisations of 8.1 on synthetic images whose answer is known in advance."""
+"""Intensity normalisations on synthetic images whose answer is known in advance."""
 
 import numpy as np
 import pytest

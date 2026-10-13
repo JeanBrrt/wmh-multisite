@@ -1,7 +1,6 @@
-"""Convert the downloaded WMH dataset into a BIDS dataset (ROADMAP step 2.2).
+"""Convert the downloaded WMH dataset into a BIDS dataset.
 
-BIDS (Brain Imaging Data Structure, https://bids-specification.readthedocs.io) is the community
-standard for organizing neuroimaging data. Layout produced in ``data/bids/``:
+Layout produced in ``data/bids/`` (https://bids-specification.readthedocs.io):
 
     dataset_description.json, README, participants.tsv, participants.json
     sub-000/anat/sub-000_FLAIR.nii.gz (+ .json)       raw FLAIR (orig/FLAIR)
@@ -16,10 +15,9 @@ standard for organizing neuroimaging data. Layout produced in ``data/bids/``:
         sub-000/anat/sub-000_desc-spm12_FLAIR.nii.gz               (bias-corrected FLAIR, pre/)
         sub-000/anat/sub-000_space-FLAIR_desc-spm12_T1w.nii.gz     (bias-corrected aligned T1, pre/)
 
-Subjects keep their original challenge id (unique across sites): ``sub-{id:03d}``.
-Files are hard links to ``data/raw/`` (same bytes, no extra disk space), or copies if the file
-system refuses links. The conversion also writes a QC inventory (``results/tables/``): geometry
-of every image, consistency of the label maps and their grids, WMH volumes.
+Subjects keep their challenge id (unique across sites): ``sub-{id:03d}``. Files are hard links to
+``data/raw/``, or copies if the file system refuses links. A QC inventory (``results/tables/``) records
+the geometry of every image, the validity and grid of the label maps, and the WMH volumes.
 
 Usage:
     uv run python -m wmh_multisite.data.bids
@@ -312,9 +310,8 @@ def inventory_row(subject: Subject, paths: dict[str, Path], naming: str) -> dict
     if row["flair_defaced"]:
         mask_path = paths["orig/FLAIR_mask.nii.gz"]
         row["flair_mask_same_grid"] = io.same_grid(mask_path, paths["orig/FLAIR.nii.gz"])
-        # The published FLAIR masks are not binary: ~1% of voxels on their border hold interpolated
-        # values in (0, 1). The FLAIR was zeroed exactly where the mask is 0 (verified on all 70), so
-        # the defaced region is defined as mask == 0 (J-028).
+        # The published FLAIR masks are not binary (~1% of border voxels are interpolated). The FLAIR
+        # was zeroed exactly where the mask is 0 (checked on all 70), so defaced means mask == 0.
         mask = io.load_data(mask_path)
         removed = mask == 0
         row["flair_mask_partial_fraction"] = round(float(((mask > 0) & (mask < 1)).mean()), 4)
@@ -338,7 +335,7 @@ def prune_stale(bids_dir: Path, produced: set[Path]) -> None:
 
 
 def convert(cfg: dict[str, Any]) -> Path:
-    """Build data/bids from data/raw (manifest of step 2.1); return the inventory path."""
+    """Build data/bids from data/raw (download manifest); return the inventory path."""
     raw_dir, bids_dir = resolve_path(cfg, "raw"), resolve_path(cfg, "bids")
     manifest = raw_dir / "manifest.csv"
     if not manifest.is_file():

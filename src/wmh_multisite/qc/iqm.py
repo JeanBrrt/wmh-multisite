@@ -1,14 +1,13 @@
-"""Image quality metrics (IQMs) of every FLAIR and T1, MRIQC protocol (ROADMAP step 4.1, J-011, J-051, J-059).
+"""Image quality metrics (IQMs) of every FLAIR and T1, following MRIQC.
 
-Why: a degraded image (motion, noise, strong bias, ghosts) gives a wrong biomarker without any warning.
-Studies control every image before analysis; IQMs make this possible at scale.
+A degraded image (motion, noise, strong bias, ghosts) silently gives a wrong biomarker; IQMs let every
+image be checked before analysis.
 
-**Same computations as MRIQC** (Esteban et al. 2017; code of nipreps/mriqc read on 2026-10-06:
-``qc/anatomical.py``, ``interfaces/anatomical.py`` StructuralQC and Harmonize), restricted to its
-essential IQMs. As in MRIQC, each IQM answers one question: the bias is measured on the N4 field only,
-noise and contrast on the image **after** N4 (on the raw image they would count the bias a second time).
+The formulas are MRIQC's (Esteban et al. 2017; nipreps/mriqc ``qc/anatomical.py`` and
+``interfaces/anatomical.py``, StructuralQC and Harmonize), for its main IQMs. The bias is measured on
+the N4 field only, noise and contrast on the image after N4, so the bias is not counted twice.
 
-    raw image / N4 field (preproc 3.1)                 = INU-corrected image
+    raw image / N4 field                               = INU-corrected image
       x 1000 / median(corrected in eroded WM)          = "harmonized" image (MRIQC Harmonize)
       rounded to integers for the tissue statistics    (MRIQC summary_stats, rprec_data=0)
 
@@ -24,21 +23,18 @@ noise and contrast on the image **after** N4 (on the raw image they would count 
     fber     median(x^2 in the head) / median(x^2 in the air)              higher
     inu_range |p95 - p5| of the N4 field in the brain                     lower
 
-**Where we differ from MRIQC, on purpose** (kept after reading its code, J-059):
-- regions from WMH-SynthSeg, not from an intensity classification (Atropos): white matter = labels
-  2/41 eroded like the WM mask of MRIQC Harmonize (18-connected structure), in place of MRIQC's
-  probability weighting, minus the WMH (label 77) and a ring of ``qc.wmh_margin_mm`` around them
-  (peri-lesional white matter made the SNR depend on the lesion load, J-059); grey matter = **cortex
-  only** (3/42), not eroded (2-3 mm thick: one erosion leaves 14-23 % of it on the FLAIR grid);
-- tissue statistics inside the HD-BET brain (rule A of J-028);
-- air = outside the dilated head, **exact zeros excluded** (rule B of J-028), in place of MRIQC's "hat"
-  above the nasion-inion plane (our FLAIRs cover only ~144 mm in height). MRIQC also drops the zeros
-  of its rotation mask; with zero-filled air its FBER would return -1;
-- no MRIQC classifier (trained on T1 of public datasets, no FLAIR).
+Deliberate differences from MRIQC:
+- Tissues come from WMH-SynthSeg, not from Atropos. White matter = labels 2/41 eroded like MRIQC
+  Harmonize's WM mask, minus the WMH (label 77) and a ring of ``qc.wmh_margin_mm`` around them
+  (otherwise the SNR tracked the lesion load). Grey matter = cortex only (3/42), not eroded: it is
+  2-3 mm thick and one erosion would leave 14-23 % of it on the FLAIR grid.
+- Tissue statistics inside the HD-BET brain.
+- Air = outside the dilated head, exact zeros excluded (only some FLAIRs are defaced), instead of
+  MRIQC's "hat" above the nasion-inion plane: our FLAIRs only cover ~144 mm in height.
+- No MRIQC classifier: it was trained on T1 only.
 
-**T1 on its own grid.** Resampling the T1 onto the FLAIR grid would smooth its noise and inflate its SNR:
-the 1 mm WMH-SynthSeg labels are carried to the T1 grid by the inverse of the rigid transform of 3.2
-(``genericLabel``).
+The T1 stays on its own grid, since resampling would smooth its noise and inflate its SNR: the
+WMH-SynthSeg labels are carried to it by the inverse rigid transform (``genericLabel``).
 
 Output: ``results/tables/qc_iqm.csv`` (one row per subject and modality). Subjects without the
 WMH-SynthSeg segmentation yet are skipped (logged).
@@ -70,19 +66,18 @@ log = logging.getLogger(__name__)
 WM_LABELS, GM_LABELS, WMH_LABEL = (2, 41), (3, 42), 77
 DIETRICH_FACTOR = 0.6551364  # MRIQC: 1 / sqrt(2 / (4 - pi)); std of a Rayleigh variable / its sigma
 METRICS = ["snr_wm", "snrd_wm", "cnr", "cjv", "efc", "fber", "inu_range"]
-# Metrics used to judge each modality (4.2). The FLAIR has almost no white/grey matter contrast
-# (median WM / median GM 0.87 to 0.99 depending on the scanner): CJV divides by |med_WM - med_GM| and
-# explodes for reasons unrelated to quality (z up to 209 on a first run). It is measured for both but
-# judged for the T1 only; MRIQC, built for T1/T2 contrasts, has no FLAIR workflow.
+# Metrics judged per modality. The FLAIR has almost no WM/GM contrast (median ratio 0.87 to 0.99), so
+# CJV, which divides by |med_WM - med_GM|, blows up for reasons unrelated to quality (z up to 209). It
+# is measured for both but judged for the T1 only.
 JUDGED = {"FLAIR": ["snr_wm", "snrd_wm", "cnr", "efc", "fber", "inu_range"], "T1w": METRICS}
-# direction of "better": +1 higher is better, -1 lower is better, 0 no direction (used by 4.2)
+# direction of "better": +1 higher is better, -1 lower is better, 0 no direction
 DIRECTION = {"snr_wm": 1, "snrd_wm": 1, "cnr": 1, "cjv": -1, "efc": -1, "fber": 1, "inu_range": -1}
 # MRIQC Harmonize erodes the white matter with this structure (scipy: 3D, connectivity 2)
 ERODE_STRUCTURE = ndimage.generate_binary_structure(3, 2)
 
 
 def background_mask(image: np.ndarray, head: np.ndarray, margin_vox: int = 3) -> np.ndarray:
-    """Air: outside the head dilated by ``margin_vox`` voxels, exact zeros excluded (rule B)."""
+    """Air: outside the head dilated by ``margin_vox`` voxels, exact zeros (defacing) excluded."""
     near_head = ndimage.binary_dilation(head, iterations=margin_vox)
     return ~near_head & (image != 0)
 
@@ -126,8 +121,7 @@ def snr_dietrich(median: float, mad_air: float, sd_air: float) -> float:
 
 
 def efc(image: np.ndarray) -> float:
-    """Entropy focus criterion (MRIQC), over the non-zero voxels (MRIQC drops the zeros of its rotation
-    mask; rule B drops the defacing zeros too)."""
+    """Entropy focus criterion (MRIQC), over the non-zero voxels, which also drops the defacing zeros."""
     x = image[image != 0].astype(np.float64)
     n = x.size
     if n < 2:
@@ -175,9 +169,8 @@ def tissues(
 ) -> tuple[np.ndarray, np.ndarray]:
     """White matter (eroded, minus the WMH and a ring of ``wmh_margin_mm`` around them) and cortex.
 
-    The ring: the white matter next to a lesion is often already abnormal (and partly lesion on the
-    T1); left in, it lowers the SNR of the subjects with many lesions (J-059). Distances in mm, with
-    the real voxel size (3 mm slices on the FLAIR grid).
+    White matter next to a lesion is often already abnormal; left in, it lowers the SNR of subjects with
+    many lesions. Distances in mm, with the real voxel size (3 mm slices on the FLAIR grid).
     """
     wm = ndimage.binary_erosion(np.isin(labels, WM_LABELS), structure=ERODE_STRUCTURE) & brain
     wmh = labels == WMH_LABEL
@@ -188,7 +181,7 @@ def tissues(
 
 
 def correct(raw: np.ndarray, field: np.ndarray) -> np.ndarray:
-    """INU-corrected image: raw / N4 field, as written by preproc 3.1 (``bias.n4_correct``)."""
+    """INU-corrected image: raw / N4 field, as in ``bias.n4_correct``."""
     raw = raw.astype(np.float64)
     return np.divide(raw, field, out=np.zeros_like(raw), where=field > 0)
 
@@ -231,8 +224,7 @@ def measure(
     spacing: tuple[float, ...] = (1.0, 1.0, 1.0),
     wmh_margin_mm: float = 0.0,
 ) -> dict[str, float]:
-    """IQMs of one image from its raw version and its N4 field (exposed for 4.3, which measures
-    artificially degraded copies after running N4 on them)."""
+    """IQMs of one image from its raw version and its N4 field (also used on degraded copies)."""
     head = head_mask(raw)
     wm, gm = tissues(labels, brain, spacing, wmh_margin_mm)
     out = tissue_iqms(correct(raw, field), wm, gm, background_mask(raw, head), head)
@@ -279,9 +271,7 @@ def run(cfg: dict[str, Any], jobs: int, config_path: str | None = None) -> pd.Da
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(
-        description="Image quality metrics of the FLAIR and T1, MRIQC protocol (4.1)."
-    )
+    parser = argparse.ArgumentParser(description="Image quality metrics of the FLAIR and T1, MRIQC protocol.")
     parser.add_argument("--config")
     parser.add_argument("--jobs", type=int, default=3)
     args = parser.parse_args(argv)

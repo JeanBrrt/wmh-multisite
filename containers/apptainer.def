@@ -1,4 +1,4 @@
-# wmh-multisite Apptainer / Singularity image for HPC (ROADMAP step 9.4, J-062): the GPU image
+# wmh-multisite Apptainer / Singularity image for HPC: the GPU image
 # (nnU-Net, HD-BET with CUDA PyTorch) plus every CPU stage of the pipeline.
 #
 # NOT TESTED on Jean Zay (no account): written from the IDRIS documentation, to check before use.

@@ -1,22 +1,21 @@
-"""Atypical images: robust z-scores per scanner + Isolation Forest (ROADMAP step 4.2, J-051).
+"""Atypical images: robust z-scores per scanner + Isolation Forest.
 
-IQMs depend on the scanner (noise, contrast: e.g. the 2D FLAIRs of Utrecht have almost no white/grey
-matter contrast). Judged together, the subjects of a whole site would be flagged: each image is judged
-**against the images of its own scanner**.
+IQMs depend on the scanner (the 2D FLAIRs of Utrecht have almost no WM/GM contrast), so pooled together
+a whole site would be flagged. Each image is judged against the images of its own scanner.
 
-    qc_iqm.csv (4.1)
+    qc_iqm.csv
       1. robust z per scanner and modality: z = (x - median_scanner) / (1.4826 MAD_scanner), signed so that
          a positive z means "worse" (``iqm.DIRECTION``; metrics without a direction use |z|)
       2. Isolation Forest on these z (FLAIR and T1 together): isolates each subject by random cuts; an
          atypical subject is isolated in few cuts, including unusual *combinations* that no single IQM shows
       3. classes ("not_assessed" if the scanner has fewer than ``min_per_scanner`` images):
          exclude if max z >= ``z_exclude``; check if max z >= ``z_check`` or Isolation Forest
-         outlier; usable otherwise. A recommendation for visual control (4.4), never an automatic exclusion.
-      4. validation: do flagged test subjects have a lower Dice for M1 (6.1)?
+         outlier; usable otherwise. A prompt for visual review, never an automatic exclusion.
+      4. validation: do flagged test subjects have a lower Dice for M1?
       v
     results/tables/qc_flags.csv
 
-Median and MAD rather than mean and SD: a very bad image would pull the mean and hide its own deviation.
+Median and MAD rather than mean and SD, because a very bad image would pull the mean and hide itself.
 
 Usage:
     uv run python -m wmh_multisite.qc.outliers
@@ -102,7 +101,7 @@ def validate(flags: pd.DataFrame, evaluation: pd.DataFrame) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Atypical images per scanner (4.2).")
+    parser = argparse.ArgumentParser(description="Atypical images per scanner.")
     parser.add_argument("--config")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)

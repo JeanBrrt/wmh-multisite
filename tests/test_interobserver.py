@@ -1,4 +1,4 @@
-"""Inter-observer agreement (6.3): ignore mask carried over, comparisons and summary on tiny volumes."""
+"""Inter-observer agreement: ignore mask carried over, comparisons and summary on tiny volumes."""
 
 import nibabel as nib
 import numpy as np

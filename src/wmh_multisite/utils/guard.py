@@ -1,4 +1,4 @@
-"""Memory watchdog for heavy jobs (J-005).
+"""Memory watchdog for heavy jobs (the local machine froze twice without it).
 
 Two entry points:
 - ``run_guarded(cmd)``: run an external command (ANTs CLI, nnU-Net, ...).
@@ -43,7 +43,7 @@ def _tree_rss_gb(proc: psutil.Process) -> float:
     """RSS of a process and its children; 0 for a process that has already exited.
 
     The process can end between any two psutil calls (a fast job): ``children()`` then raises
-    ``NoSuchProcess``. This race made the watchdog tests fail intermittently (ROADMAP, points to study).
+    ``NoSuchProcess``; this race used to make the watchdog tests fail intermittently.
     """
     total = 0
     try:

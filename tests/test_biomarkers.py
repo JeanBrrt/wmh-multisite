@@ -1,4 +1,4 @@
-"""Biomarkers 7.1 (volumes) and 7.3 (lesions) on small masks whose answer is known in advance."""
+"""Biomarkers (volumes, lesions, location) on small masks whose answer is known in advance."""
 
 import numpy as np
 import pytest
@@ -96,7 +96,7 @@ def test_subject_rows_reads_files(nifti):
     rows = subject_rows(task)
     by = {r["source"]: r for r in rows}
     assert by["O1"]["wmh_ml"] == pytest.approx(14 * 3 / 1000)  # label-2 voxel is not WMH
-    assert by["M"]["wmh_ml"] == pytest.approx(14 * 3 / 1000)  # the model's speck is removed like in 6.1
+    assert by["M"]["wmh_ml"] == pytest.approx(14 * 3 / 1000)  # the model's speck is removed too
     assert by["M"]["n_lesions"] == 2
     assert by["M"]["ventricle_source"] == "ventriclessynthseg"
     # 12-voxel lesion: within 2 mm of the ventricles; corner pair: 3.2 and 4.1 mm away -> deep
@@ -115,7 +115,7 @@ def test_ventricle_source_priority(tmp_path, monkeypatch):
     anat.mkdir(parents=True)
     assert table.ventricles_for(cfg, "sub-x") == (None, None)
     (anat / "sub-x_space-FLAIR_desc-ventricles_mask.nii.gz").touch()
-    assert table.ventricles_for(cfg, "sub-x")[0] == "ventricles"  # fallback: atlas C
+    assert table.ventricles_for(cfg, "sub-x")[0] == "ventricles"  # fallback: atlas ventricles
     (anat / "sub-x_space-FLAIR_desc-ventriclessynthseg_mask.nii.gz").touch()
     assert table.ventricles_for(cfg, "sub-x")[0] == "ventriclessynthseg"  # preferred when present
 

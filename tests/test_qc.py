@@ -1,4 +1,4 @@
-"""Phase 4 (image quality control) on synthetic volumes whose answer is known in advance."""
+"""Image quality control on synthetic volumes whose answer is known in advance."""
 
 import numpy as np
 import pandas as pd

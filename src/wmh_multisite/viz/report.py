@@ -1,11 +1,10 @@
-"""QC report: table of the IQM classes + thumbnails of the flagged images (ROADMAP step 4.4, J-051).
+"""QC report: table of the IQM classes + thumbnails of the flagged images.
 
-A single self-contained HTML file (thumbnails embedded as PNG): the tool of the visual control that 4.2
-recommends. For every subject classed "check" or "exclude": central axial, coronal and sagittal slices
-of the raw FLAIR and T1, with its worst metrics.
+One self-contained HTML file for the visual review: for every subject classed "check" or "exclude",
+the central axial, coronal and sagittal slices of the raw FLAIR and T1, with its worst metrics.
 
-**Never published**: the thumbnails are patient images (CC BY-NC 4.0 data). The report is written to
-``results/qc/``, which git ignores (``results/*``); only aggregated numbers go to the README.
+Never published: the thumbnails are patient images (CC BY-NC 4.0). The report goes to ``results/qc/``,
+which git ignores; only aggregated numbers reach the README.
 
 Usage:
     uv run python -m wmh_multisite.viz.report
@@ -71,7 +70,7 @@ def build_html(flags: pd.DataFrame, thumbs: dict[str, dict[str, str]]) -> str:
         ".check{background:#fff3cd}.exclude{background:#f8d7da}img{max-width:100%}</style></head><body>",
         "<h1>wmh-multisite: image quality control</h1>",
         "<p>Local report, never published (patient images, CC BY-NC data). Classes: robust z per scanner "
-        "(positive = worse) and Isolation Forest (step 4.2). "
+        "(positive = worse) and Isolation Forest. "
         "A class is a recommendation for visual control.</p>",
         "<h2>Classes per scanner</h2>",
         counts.to_html(),
@@ -99,7 +98,7 @@ def build_html(flags: pd.DataFrame, thumbs: dict[str, dict[str, str]]) -> str:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Local HTML QC report (4.4).")
+    parser = argparse.ArgumentParser(description="Local HTML QC report.")
     parser.add_argument("--config")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)

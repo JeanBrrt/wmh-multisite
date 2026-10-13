@@ -40,7 +40,7 @@ dependencies = [
 qc = ["torchio>=1.2"]
 # Feature-level harmonization (ComBat / ComBat-GAM).
 # neuroHarmonize 2.5.x pins numpy<2, so the resolver falls back to 2.4.5, whose
-# metadata declares no dependencies: its runtime imports are listed explicitly (J-022).
+# metadata declares no dependencies: its runtime imports are listed explicitly.
 harmonize = ["neuroHarmonize>=2.4", "neuroCombat==0.2.12", "statsmodels>=0.14"]
 # Deep-learning segmentation and brain extraction: run on Kaggle GPU, not locally.
 seg = ["nnunetv2>=2.6", "hd-bet>=2.0"]

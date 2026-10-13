@@ -1,7 +1,5 @@
-# Continuous integration (ROADMAP steps 9.3 and 9.4, J-061, J-062): lint, tests and the Docker image
-# on every push and pull request.
-# No data is needed: the tests build tiny synthetic images (J-029). The environment is the locked one
-# (uv.lock), so the CI runs the same versions as the development machine.
+# CI: lint, tests and the Docker image on every push and pull request.
+# No data needed: the tests build tiny synthetic images. Same locked versions (uv.lock) as locally.
 name: ci
 
 on:
@@ -34,7 +32,7 @@ jobs:
       - name: Tests (pytest)
         run: uv run pytest -q --cov=wmh_multisite --cov-report=term
 
-  # 9.4: the CPU image must build from the locked environment and import the pipeline
+  # the CPU image must build from the locked environment and import the pipeline
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 30

@@ -1,13 +1,13 @@
-"""Site classifier (8.2) and ComBat harmonisation (8.3) of the NAWM features (J-022, J-059).
+"""Site classifier and ComBat harmonisation of the NAWM features.
 
 Can the scanner be guessed from the image features of the normal-appearing white matter? After
 ComBat, can it still be guessed, and is the biology (WMH load) kept?
 
-    nawm_features.csv (8.2): 20 features per subject (FLAIR and T1), scales ``none`` and ``zscore``
+    nawm_features.csv: 20 features per subject (FLAIR and T1), scales ``none`` and ``zscore``
       1. site classifier: standardisation + multinomial logistic regression, 5-fold cross-validation
          stratified by scanner; balanced accuracy (chance = 1 / 5 scanners = 0.20)
-      2. ComBat (neuroHarmonize, empirical Bayes) **learnt on the training folds and applied to the test
-         fold** of the same cross-validation: the classifier never sees data harmonised with its own
+      2. ComBat (neuroHarmonize, empirical Bayes) learnt on the training folds and applied to the test
+         fold of the same cross-validation: the classifier never sees data harmonised with its own
          test subjects. Biological covariates kept: ln(1 + WMH volume of O1) and the ICV.
          (Fitting on the 60 training subjects of the challenge is impossible: the 2 unseen scanners
          have no training subject, and ComBat cannot harmonise a site it has never seen.)

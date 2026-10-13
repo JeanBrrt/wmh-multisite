@@ -1,10 +1,10 @@
-"""Lesion frequency maps in MNI space, per site and per source (ROADMAP step 7.5, J-054, J-056).
+"""Lesion frequency maps in MNI space, per site and per source.
 
 Where do the WMH lie, in a common space, for each site and each segmentation method?
 
     lesion mask of a source (FLAIR grid; label 2 of O1 removed, as everywhere)
-      1. -> raw T1 grid: inverse of the rigid transform of 3.2
-      2. -> MNI152NLin2009cAsym 2 mm: affine + SyN CC deformation of the night run (J-054)
+      1. -> raw T1 grid: inverse of the rigid transform
+      2. -> MNI152NLin2009cAsym 2 mm: affine + SyN CC deformation
          ``linear`` interpolation both times: a 2 mm voxel half covered by a lesion reads 0.5 (the
          covered fraction is kept instead of being rounded to 0 or 1)
       -> sub-XXX_space-MNI152NLin2009cAsym_res-2_label-WMH_desc-<source>_probseg.nii.gz
@@ -12,9 +12,9 @@ Where do the WMH lie, in a common space, for each site and each segmentation met
     agreement of a method with O1 = voxel-wise Pearson correlation of the two maps inside the brain,
     on the same (test) subjects; difference map (method - O1) shows where a method over-/under-segments
 
-Two resamplings in a row instead of one composed transform: each step reuses a convention already
-checked in the project (``qc.iqm.labels_to_t1`` for the inverse rigid, notebook 06 for [warp, affine]),
-at the cost of a little extra smoothing, harmless for a frequency map.
+Two resamplings rather than one composed transform: each reuses a convention already checked
+(``qc.iqm.labels_to_t1`` for the inverse rigid, [warp, affine] for the template), for a little extra
+smoothing that does not matter in a frequency map.
 
 Sources: O1 for the 170 subjects (training and test); the models on the 110 test subjects; the experts
 O3 and O4 on the 60 training subjects (human reference for the map agreement, compared with the O1 map
@@ -189,7 +189,7 @@ def figure(
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Lesion frequency maps in MNI space (7.5).")
+    parser = argparse.ArgumentParser(description="Lesion frequency maps in MNI space.")
     parser.add_argument("--config")
     parser.add_argument("--jobs", type=int, default=4)
     args = parser.parse_args(argv)

@@ -1,4 +1,4 @@
-"""Periventricular / deep split (7.2) on small masks with known distances (1 x 1 x 3 mm voxels)."""
+"""Periventricular / deep split on small masks with known distances (1 x 1 x 3 mm voxels)."""
 
 import numpy as np
 import pytest

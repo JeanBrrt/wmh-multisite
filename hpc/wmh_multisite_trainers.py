@@ -1,4 +1,4 @@
-"""Custom nnU-Net trainers of the project (J-037, J-052): 250 epochs, a checkpoint every 50 epochs.
+"""Custom nnU-Net trainers of the project: 250 epochs, a checkpoint every 50 epochs.
 
 nnU-Net finds trainers by class name inside its own package, so this file is copied into
 ``nnunetv2/training/nnUNetTrainer/variants/`` by the containers (``containers/``) and by the Kaggle

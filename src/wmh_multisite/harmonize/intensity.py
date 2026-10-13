@@ -1,13 +1,12 @@
-"""Intensity normalisation of the FLAIR (ROADMAP step 8.1, J-028, J-055).
+"""Intensity normalisation of the FLAIR.
 
-MRI intensities have no unit: the same tissue reads 400 on one scanner and 900 on another. A rule
-applied to intensities (the threshold M3, the features of 8.2) needs them on a common scale. Four ways,
-all computed **inside the HD-BET brain mask** (J-028, rule A: the head mask, with or without the face,
-would differ between sites):
+MRI intensities have no unit: the same tissue reads 400 on one scanner and 900 on another, so the M3
+threshold and the NAWM features need a common scale. All four methods work inside the HD-BET brain
+mask, since a head mask (with or without the face) would differ between sites:
 
     none        I / C, C = median of the training brains (one constant for everybody: no per-image
                 correction; the baseline that shows what normalisation brings)
-    zscore      (I - median) / (1.4826 MAD), over the brain of the image (the M3 of 5.5)
+    zscore      (I - median) / (1.4826 MAD), over the brain of the image (as in M3)
     whitestripe (I - mean) / SD over the normal-appearing white matter of the image (WMH-SynthSeg white
                 matter, labels 2 and 41; the WMH have their own label 77). A variant of WhiteStripe
                 (Shinohara et al. 2014), which finds the white-matter peak in the histogram: here the
@@ -17,8 +16,7 @@ would differ between sites):
                 image's [p1, p99] is mapped linearly onto [0, 100], and the standard landmarks are the
                 means of the mapped percentiles
 
-Parameters learnt on the training set only (J-013): the constant of ``none`` and the standard
-landmarks of ``histmatch``.
+The constant of ``none`` and the landmarks of ``histmatch`` are learnt on the training set only.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-# wmh-multisite container (ROADMAP step 9.4, J-062).
+# wmh-multisite container.
 #
 # One recipe, two images, chosen by UV_EXTRAS (the optional dependency groups of pyproject.toml):
 #   CPU image (default): preprocessing, QC indicators, thresholding, evaluation, biomarkers,
@@ -7,8 +7,8 @@
 #   GPU image: adds nnU-Net and HD-BET (PyTorch with CUDA on Linux) and the project's trainers.
 #       docker build -f containers/Dockerfile --build-arg UV_EXTRAS="--extra harmonize --extra workflow --extra seg" -t wmh-multisite:gpu .
 #
-# The environment is the locked one (uv.lock): same versions as the development machine and the CI.
-# Data are never copied in the image (.dockerignore); mount them at run time:
+# Same locked versions (uv.lock) as locally and in the CI. Data never go into the image
+# (.dockerignore); mount them at run time:
 #   docker run --rm -v "$PWD/data:/opt/wmh-multisite/data" -v "$PWD/results:/opt/wmh-multisite/results" \
 #     wmh-multisite snakemake -s workflow/Snakefile -n
 

@@ -1,9 +1,8 @@
-"""Inter-observer agreement on the training set: the human ceiling (ROADMAP step 6.3, J-046).
+"""Inter-observer agreement on the training set: the human ceiling.
 
-Why: the reference standard (O1) is itself one expert's delineation. Two experts never draw exactly
-the same lesions, so no method can be expected to reach Dice = 1 against O1. Scoring two other experts
-(O3, O4, who delineated the 60 training scans independently) against O1 **with the same official
-metrics** gives the level a human reaches: the ceiling against which a method is read.
+O1 is itself one expert's drawing, and two experts never draw the same lesions, so no method can reach
+Dice = 1 against it. Scoring two other experts (O3, O4, who delineated the 60 training scans on their
+own) against O1 with the same official metrics gives the level a human reaches.
 
     60 training scans                                       (official metrics, label 2 of O1 ignored)
       O1 (reference) <---- O3                               "how far is one human from the reference?"
@@ -12,17 +11,12 @@ metrics** gives the level a human reaches: the ceiling against which a method is
     12 of them never seen by nnU-Net (fold-0 validation cases)
       O1 (reference) <---- M1 (nnU-Net)                     paired with O3 and O4 on the same 12 scans
 
-Reading the metrics in this setting:
-- Dice, HD95 and lesion F1 are **symmetric** (swapping the two masks gives the same value), so the
-  O3-O4 comparison is well defined for them.
-- AVD (normalised by the reference volume) and lesion recall (share of the reference lesions found)
-  are **directional**; for O3-O4 they depend on which observer is taken as reference (here O3), and are
-  reported for completeness only.
+Dice, HD95 and lesion F1 are symmetric, so O3 vs O4 is well defined for them. AVD and lesion recall
+depend on which observer is the reference (here O3) and are reported for completeness only.
 
-The M1 rows use the fold-0 validation predictions written by nnU-Net at the end of training
-(``fold_0/validation``): the 12 subjects were held out from that model, which is the model used on the
-test set (final checkpoint, not selected on them). They are the only scans where M1 and the humans can
-be compared on the same images; the test-set scores of 6.1 are on other subjects.
+The M1 rows use nnU-Net's fold-0 validation predictions (``fold_0/validation``). Those 12 subjects were
+held out from the very model used on the test set (final checkpoint, not selected on them), so they are
+the only scans where M1 and the humans can be compared on the same images.
 
 Outputs:
     results/tables/interobserver.csv           one row per (subject, rater, reference)

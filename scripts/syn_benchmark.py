@@ -1,13 +1,13 @@
-"""SyN settings benchmark (step 3.6): subjects x variants, interleaved subject by subject.
+"""SyN settings benchmark: subjects x variants, interleaved subject by subject.
 
 Usage (from the repository root):
-    uv run python scripts/syn_benchmark.py         # CC only, notebook-06 subjects, sub-021 first
+    uv run python scripts/syn_benchmark.py         # CC only, default subjects, sub-021 first
     uv run python scripts/syn_benchmark.py --variants default_mattes_40-20-0 mattes_100-70-50-20 \
         --subjects sub-049 sub-021 --jobs 4 --threads 1         # the first run (deterministic, 1 thread)
 
 Speed: by default ONE task at a time with ALL the CPU threads (ITK multithreading), so that the first
 subject is finished as early as possible. Several ITK threads make the result very slightly
-non-deterministic (J-031): fine for a benchmark, not for the pipeline.
+non-deterministic: fine for a benchmark, not for the pipeline.
 
 Progress: START / END lines, and every minute a heartbeat with the elapsed time, the ANTs stage, the
 resolution level and the iteration reached (parsed from the ANTs verbose output, kept in
@@ -34,12 +34,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "derivatives" / "wmh-multisite" / "_syn_benchmark"  # transforms, masks, log
-NOTEBOOK_SUBJECTS = ["sub-021", "sub-000", "sub-002", "sub-049", "sub-053"]  # notebook 06, sub-021 first
+NOTEBOOK_SUBJECTS = ["sub-021", "sub-000", "sub-002", "sub-049", "sub-053"]  # sub-021 first
 VARIANTS = {
     "default_mattes_40-20-0": {"reg_iterations": (40, 20, 0)},
     "mattes_100-70-50-20": {"reg_iterations": (100, 70, 50, 20)},
     "cc_100-70-50-20": {"reg_iterations": (100, 70, 50, 20), "syn_metric": "CC", "syn_sampling": 4},
-    # same on the 2 mm template (8x fewer voxels); CC radius in voxels halved to keep ~4 mm (7.5)
+    # same on the 2 mm template (8x fewer voxels); CC radius in voxels halved to keep ~4 mm
     "cc2mm_100-70-50-20": {
         "reg_iterations": (100, 70, 50, 20),
         "syn_metric": "CC",
@@ -158,7 +158,7 @@ def ants_progress(log_file: Path) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="SyN settings benchmark (step 3.6).")
+    parser = argparse.ArgumentParser(description="SyN settings benchmark.")
     parser.add_argument("--variants", nargs="+", default=["cc_100-70-50-20"], choices=list(VARIANTS))
     parser.add_argument("--subjects", nargs="+", default=NOTEBOOK_SUBJECTS, help='subject ids, or "all"')
     parser.add_argument("--jobs", type=int, default=1, help="tasks in parallel")

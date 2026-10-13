@@ -1,10 +1,10 @@
-"""Normal-appearing white matter features, per subject (ROADMAP step 8.2, J-028, J-059).
+"""Normal-appearing white matter features, per subject.
 
-Image-derived features carry the scanner: the same tissue reads differently on each site. These
-features are what a multi-site study would compare between patients, and what 8.2 / 8.3 test for a
-site signature before and after harmonisation.
+The same tissue reads differently on each site. These are the features a multi-site study would
+compare between patients, and ``harmonize.combat`` tests them for a site signature before and after
+harmonisation.
 
-    FLAIR N4 and T1 N4 (on the FLAIR grid), HD-BET brain mask (J-028, rule A)
+    FLAIR N4 and T1 N4 (on the FLAIR grid), HD-BET brain mask
     tissues of WMH-SynthSeg: white matter (2, 41; the WMH have their own label 77, so this is the
     normal-appearing white matter, NAWM), cortex (3, 42)
     intensity scale: ``none`` (I / median of the training brains, one constant per modality) or
@@ -13,8 +13,6 @@ site signature before and after harmonisation.
          cortex median and cortex - NAWM median (grey/white contrast)
       v
     results/tables/nawm_features.csv (one row per subject and scale)
-
-No background statistic is used (J-028, rule B not involved).
 
 Usage:
     uv run python -m wmh_multisite.harmonize.features
@@ -83,7 +81,7 @@ def subject_features(task: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def training_constants(cfg: dict[str, Any], train: list[str]) -> dict[str, dict[str, float]]:
-    """``none`` scale: one constant per modality, the median of the training brains (J-013)."""
+    """``none`` scale: one constant per modality, the median of the training brains."""
     d = resolve_path(cfg, "derivatives") / PIPELINE
     out = {}
     for modality, pattern in MODALITIES.items():
@@ -111,7 +109,7 @@ def build(cfg: dict[str, Any], jobs: int, config_path: str | None = None) -> pd.
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Normal-appearing white matter features (8.2).")
+    parser = argparse.ArgumentParser(description="Normal-appearing white matter features.")
     parser.add_argument("--config")
     parser.add_argument("--jobs", type=int, default=4)
     args = parser.parse_args(argv)

@@ -1,17 +1,17 @@
-"""Robustness of nnU-Net (M1) to image artifacts (extension of ROADMAP step 4.3, J-057).
+"""Robustness of nnU-Net (M1) to image artifacts.
 
-4.3 asked "does the QC detect a degraded image?"; the question that matters is "from which artifact
-level does the segmentation itself degrade?". An artifact the QC misses but that does not harm the
-segmentation is harmless; one that harms it before the QC sees it is a real risk.
+``qc.artifacts`` asks whether the QC detects a degraded image; what matters is the artifact level at
+which the segmentation itself degrades. An artifact the QC misses is harmless if the segmentation
+survives it, and a real risk if the segmentation breaks first.
 
     10 test subjects of class "usable" (``qc.robustness.n_per_scanner`` per scanner; test subjects so
     that the model has never seen them)
       x artifact (noise, motion, bias, ghosting) x level 1..4 (``qc.artifacts.levels``; level 0 = the
         existing prediction on the unmodified image)
-      -> the **model input** (FLAIR N4) degraded with TorchIO (``qc.artifacts.degrade``, fixed seed); the
+      -> the model input (FLAIR N4) degraded with TorchIO (``qc.artifacts.degrade``, fixed seed); the
          T1 channel is left intact (only the FLAIR is degraded)
-      -> nnU-Net (same model, same inference settings as 5.3)
-      -> official metrics against O1 (6.1)
+      -> nnU-Net (same model and inference settings as on the test set)
+      -> official metrics against O1
       v
     results/tables/robustness_nnunet.csv, results/figures/robustness_nnunet.png
 

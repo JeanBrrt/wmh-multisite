@@ -1,18 +1,15 @@
-"""N4 bias field correction (ROADMAP step 3.1), with the HD-BET brain mask (J-034, J-036).
+"""N4 bias field correction with the HD-BET brain mask.
 
-Pipeline order (J-036): HD-BET brain mask on the raw T1 (3.3) -> rigid registration of the raw images
-(3.2) -> brain mask carried onto the FLAIR grid (3.3) -> **this step**.
+Runs last in the preprocessing, once the brain masks exist on both grids. The raw FLAIR and the raw
+3D T1 (1 mm, not resampled) are corrected with N4 (Tustison et al. 2010), which fits a smooth
+multiplicative field on the voxels of a mask. The HD-BET brain mask is used because it means the same
+thing on every site; an Otsu head mask changed with the scanner contrast. The corrected T1 is then
+resampled onto the FLAIR grid as the second nnU-Net channel.
 
-For each subject, the raw FLAIR and the raw 3D T1 (at 1 mm, before any resampling) are corrected with
-N4 (ANTs, Tustison et al. 2010). N4 estimates a smooth multiplicative field from the voxels of a mask:
-the HD-BET brain mask of each grid (same definition on every site; the Otsu head mask changed nature
-with the scanner contrast, J-030, J-034). The corrected T1 is then resampled onto the FLAIR grid with
-the rigid transform: it is the second channel of nnU-Net.
+``preproc.n4.mask: otsu`` reproduces the earlier Otsu variant (kept in
+``data/derivatives/wmh-multisite-otsu`` for comparison).
 
-``preproc.n4.mask: otsu`` in the config reproduces the first variant (Otsu head mask), archived in
-``data/derivatives/wmh-multisite-otsu`` for the comparison report.
-
-Outputs, in ``data/derivatives/wmh-multisite/sub-XXX/anat/`` (BIDS derivative naming):
+Outputs, in ``data/derivatives/wmh-multisite/sub-XXX/anat/``:
     sub-XXX_desc-n4_FLAIR.nii.gz             corrected FLAIR (float32, FLAIR grid)
     sub-XXX_desc-biasfield_FLAIR.nii.gz      estimated field (corrected = raw / field)
     sub-XXX_desc-n4_T1w.nii.gz, sub-XXX_desc-biasfield_T1w.nii.gz   same for the T1 (T1 grid)
@@ -76,10 +73,8 @@ def n4_correct(
     """Return (corrected, field, mask) as arrays in the voxel order of the file.
 
     ``mask`` (same voxel order as the file) defines where N4 estimates the field; None = Otsu head mask.
-    The mask is turned into an ANTs image with ``new_image_like``, which copies origin, spacing and
-    direction: no bare array travels between libraries (the pitfall shown in notebook 01). N4 returns
-    the field; the correction is the division raw / field, so that the stored field and the stored
-    image are exactly consistent.
+    ``new_image_like`` gives the mask the image's origin, spacing and direction, so no bare array
+    crosses libraries. The correction is raw / field, so the stored field and image stay consistent.
     """
     image = ants.image_read(str(image_path), pixeltype="float")
     mask = head_mask(image.numpy()) if mask is None else mask.astype(bool)
@@ -146,7 +141,7 @@ def correct_subject(sub: str, config_path: str | None = None, shrink_factor: int
                 **_qc(field, mask),
             }
         )
-    # Second nnU-Net channel: the corrected T1 on the FLAIR grid (rigid transform of step 3.2).
+    # Second nnU-Net channel: the corrected T1 on the FLAIR grid.
     t1_on_flair = out / f"{sub}_space-FLAIR_desc-n4_T1w.nii.gz"
     if not t1_on_flair.is_file():
         if not xfm.is_file():

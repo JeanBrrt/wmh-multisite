@@ -1,16 +1,13 @@
-"""Lesion structure: number and size distribution of the WMH (ROADMAP step 7.3, J-048).
+"""Lesion structure: number and size distribution of the WMH.
 
-A lesion is a connected component of the WMH mask, with **26-connectivity** (voxels touching by a face,
-an edge or a corner), exactly as the official challenge script counts lesions
-(``ConnectedComponentImageFilter`` with ``SetFullyConnected(True)``).
+A lesion is a 26-connected component of the WMH mask, as in the official challenge script.
 
-Two pitfalls, hence the indicators:
-- **The smallest lesion a mask can hold is one voxel, whose size depends on the scanner** (1.75 to
-  4.72 mm3 on our FLAIR grids): a fine grid records tiny lesions that a coarse grid cannot represent.
-  The raw count is therefore not comparable between sites; ``n_lesions_ge_min`` counts only lesions of
-  at least ``min_lesion_mm3`` (10 mm3: about 2 voxels on the coarsest grid, 6 on the finest).
-- **Confluence**: as the load grows, lesions merge into one large periventricular plaque, and the
-  count can *decrease*. ``largest_share`` (share of the WMH volume in the largest lesion) measures it.
+Two pitfalls shape the indicators:
+- The smallest possible lesion is one voxel, and voxels range from 1.75 to 4.72 mm3 across scanners, so
+  raw counts are not comparable between sites. ``n_lesions_ge_min`` only counts lesions of at least
+  ``min_lesion_mm3`` (10 mm3: about 2 voxels on the coarsest grid, 6 on the finest).
+- As the load grows, lesions merge into one periventricular plaque and the count can drop.
+  ``largest_share`` (share of the volume in the largest lesion) tracks this.
 """
 
 from __future__ import annotations

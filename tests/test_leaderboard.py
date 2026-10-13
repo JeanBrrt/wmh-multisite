@@ -1,4 +1,4 @@
-"""Official WMH challenge ranking (6.4) and the summary figures."""
+"""Official WMH challenge ranking and the summary figures."""
 
 import pandas as pd
 import pytest

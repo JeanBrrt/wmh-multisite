@@ -1,13 +1,8 @@
-"""Download the MICCAI WMH 2017 dataset from DataverseNL (ROADMAP step 2.1).
+"""Download the MICCAI WMH 2017 dataset from DataverseNL (doi:10.34894/AECRSD).
 
-The dataset is published file by file (doi:10.34894/AECRSD). This module:
-1. lists every file through the Dataverse API (path, size, SHA-1 checksum);
-2. keeps only the files listed in config.yaml (``dataset.keep``, observers, extra files);
-3. downloads them in parallel into ``data/raw/``, mirroring the published tree;
-4. verifies each file against its published SHA-1 (a truncated or corrupted download is retried);
-5. writes ``data/raw/manifest.csv`` (one row per file: paths, size, checksum, status).
-
-Re-running is cheap: files already present with the right checksum are skipped.
+Lists the published files through the Dataverse API, keeps those selected in config.yaml, downloads
+them in parallel into ``data/raw/`` (mirroring the published tree), checks each against its SHA-1 and
+writes ``data/raw/manifest.csv``. Files already present with the right checksum are skipped.
 
 Usage:
     uv run python -m wmh_multisite.data.download --split training   # 60 training subjects first
@@ -179,7 +174,7 @@ def download_file(
                         digest.update(chunk)
             if digest.hexdigest() != rf.sha1:
                 raise OSError(f"SHA-1 mismatch (got {digest.hexdigest()}, expected {rf.sha1})")
-            os.replace(tmp, dest)  # atomic rename
+            os.replace(tmp, dest)
             return "downloaded"
         except (requests.RequestException, OSError) as err:
             tmp.unlink(missing_ok=True)
