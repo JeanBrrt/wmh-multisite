@@ -2,6 +2,9 @@
 
 [![ci](https://github.com/JeanBrrt/wmh-multisite/actions/workflows/ci.yml/badge.svg)](https://github.com/JeanBrrt/wmh-multisite/actions/workflows/ci.yml)
 
+> [!IMPORTANT]
+> **Projet en cours.** Le code et les résultats évoluent encore, et un rapport PDF détaillant la démarche et les résultats est en cours de rédaction.
+
 **Chaîne reproductible d'analyse multicentrique des hyperintensités de la substance blanche (HSB) en IRM** : des images brutes aux biomarqueurs, avec contrôle qualité, segmentation, évaluation statistique et harmonisation inter-sites.
 
 Les données proviennent du challenge MICCAI WMH 2017 (170 IRM FLAIR + T1 issues de **5 scanners** sur 3 sites différents).
