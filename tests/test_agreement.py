@@ -104,3 +104,14 @@ def test_figure_is_written(tmp_path):
     path = tmp_path / "ba.png"
     bland_altman_figure(fake_pairs(), "test", path)
     assert path.is_file() and path.stat().st_size > 0
+
+
+def test_kruskal_wallis_p_values_are_holm_corrected(tmp_path, monkeypatch):
+    from wmh_multisite.biomarkers import agreement as ag
+    from wmh_multisite.evaluate.stats import holm
+
+    raw = pd.DataFrame({"p_kruskal_site": [0.01, 0.04, np.nan, 0.5]})
+    tested = raw.p_kruskal_site.notna()
+    expected = holm(raw.loc[tested, "p_kruskal_site"].to_numpy())
+    assert expected.tolist() == pytest.approx([0.03, 0.08, 0.5])  # 3 tests: x3, x2, x1, monotone
+    assert hasattr(ag, "holm")

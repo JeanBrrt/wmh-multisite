@@ -143,7 +143,7 @@ On calcule les biomarqueurs suivant pour chaque sujet et chaque source de segmen
 **Méthodes statistiques.**
 - **Bland-Altman**: le **biais** (moyenne des d ramenée en rapport par une exponentielle) dit si la source mesure trop ou trop peu en moyenne et les **limites d'accord** encadrent l'erreur sur 95 % des patients pris un par un. La formule classique (biais ± 1,96 écart type) suppose que les d suivent une loi normale, donc symétrique. Ce n'est pas le cas ici : pour M1, les erreurs ont une longue queue du côté des sous-estimations (asymétrie −1,4 ; normalité rejetée par le test de Shapiro-Wilk, p < 0,001). On lit donc directement les limites dans les données : les **2,5e et 97,5e centiles des d** (limites « empiriques »).
 - **ICC d'accord absolu** (ICC(A,1), McGraw et Wong) : sur le logarithme des volumes, avec un IC bootstrap stratifié par scanner : la part de la variabilité due aux vraies différences entre patients plutôt qu'aux erreurs de mesure (1 = accord parfait). Contrairement à une corrélation il pénalise un écart systématique (une méthode qui doublerait tous les volumes aurait une corrélation de 1).
-- **Biais par site** : **sur chaque scanner**, le biais avec son IC bootstrap et un test de Wilcoxon contre 0 (le biais de ce scanner est-il différent de zéro ?), corrigé par Holm sur les 116 tests ([tableau D3](#d3)) ; **entre les scanners**, un test de Kruskal-Wallis par source, qui compare les erreurs des 5 scanners entre elles   ([tableau D2](#d2), dernière colonne).
+- **Biais par site** : **sur chaque scanner**, le biais avec son IC bootstrap et un test de Wilcoxon contre 0 (le biais de ce scanner est-il différent de zéro ?), corrigé par Holm sur les 116 tests ([tableau D3](#d3)) ; **entre les scanners**, un test de Kruskal-Wallis par source, qui compare les erreurs des 5 scanners entre elles, corrigé par Holm sur les 28 tests ([tableau D2](#d2), dernière colonne).
 - **Cartes MNI** : chaque masque est transporté dans l'espace commun (FLAIR → T1 → MNI), puis on calcule la proportion de sujets ayant une lésion en chaque voxel. L'accord avec O1 est la **corrélation de Pearson voxel à voxel** entre les cartes (même motif spatial = 1), complétée par des cartes de différence qui montrent où se situent les écarts.
 
 **Résultats clés.**
@@ -151,7 +151,7 @@ On calcule les biomarqueurs suivant pour chaque sujet et chaque source de segmen
 - **M3 est juste en moyenne mais imprécis par patient** (1,18 [0,38 ; 6,14], ICC 0,81) ; **M2 surestime d'un facteur 2,4** (ICC 0,37) et n'est pas utilisable comme biomarqueur sur ce protocole ([tableau D2](#d2)).
 - **Les lésions profondes sont moins bien mesurées** que les périventriculaires : M1 les sous-estime de 13 % (0,87 [0,31 ; 1,40], ICC 0,964, contre 1,00 [0,54 ; 1,32] et 0,982). Les experts aussi (0,86 et 0,78) : O1 annote plus de lésions profondes que les autres ([tableau D2](#d2)).
 - **Nombre de lésions** : M1 en compte environ 18 % de moins que O1 (ICC 0,89), au niveau des experts (0,85 et 0,88) ; M3, qui élimine les petites lésions, est à 0,31 ([tableau D2](#d2)).
-- **Le biais dépend du site pour M1, M3 et les deux experts** (Kruskal-Wallis p < 0,001), mais pas pour M2 (p = 0,10), dont la surestimation est forte mais uniforme. M1 sous-estime d'environ 13 % à Utrecht (0,87 [0,80 ; 0,95]) et surestime d'environ 10 % sur GE 1,5T (1,10 [1,06 ; 1,14]) ; ces écarts ne restent pas significatifs après la correction de Holm (p = 0,08 et 0,27). Les experts ont aussi des biais de site : O4 sous-estime de 20 % à Singapour (p Holm = 0,003) ([tableau D3](#d3)). Une partie du « biais de site » d'une méthode reflète donc le style de la référence sur certains sites, et, sans données démographiques, un biais associé au site peut venir de la population autant que du scanner.
+- **Le biais dépend du site pour M1, M3 et les deux experts** (Kruskal-Wallis, p ≤ 0,005 après correction de Holm), mais pas pour M2 (p = 0,73), dont la surestimation est forte mais uniforme. M1 sous-estime d'environ 13 % à Utrecht (0,87 [0,80 ; 0,95]) et surestime d'environ 10 % sur GE 1,5T (1,10 [1,06 ; 1,14]) ; ces écarts ne restent pas significatifs après la correction de Holm (p = 0,08 et 0,27). Les experts ont aussi des biais de site : O4 sous-estime de 20 % à Singapour (p Holm = 0,003) ([tableau D3](#d3)). Une partie du « biais de site » d'une méthode reflète donc le style de la référence sur certains sites, et, sans données démographiques, un biais associé au site peut venir de la population autant que du scanner.
 - **Les lésions sont placées aux bons endroits** : la carte de M1 corrèle à 0,995 avec celle de O1 (0,97 à 0,99 par site), comme celles des experts O3 et O4 (0,993 et 0,992, sur les cas d'entraînement), contre 0,90 pour M3 et 0,88 pour M2 (0,67 sur GE 1,5T). Les cartes de différence montrent que l'excès de M2 se concentre dans un liseré le long des ventricules, et que M3 fait des faux positifs sur la ligne médiane ([tableau D4](#d4)).
 
 ### 6. Harmonisation
@@ -380,47 +380,47 @@ Lecture : le **champ de biais** est détecté (60 % au niveau 2) avant que le Di
 <a id="d2"></a>
 #### D2. Accord des biomarqueurs avec la référence O1 (Bland-Altman sur l'échelle logarithmique, ICC d'accord absolu)
 
-Biais : moyenne des d = ln(source / O1), puis exponentielle (moyenne géométrique des rapports ; 0,98 = 2 % de moins que O1). Limites d'accord : 2,5e et 97,5e centiles des rapports individuels ; elles décrivent la dispersion des patients, ce ne sont **pas** des intervalles de confiance. Entre crochets : intervalle de confiance à 95 % de l'ICC (bootstrap stratifié par scanner). Les sujets sans lésion profonde (ou périventriculaire) sont exclus de ce biomarqueur ; le nombre de lésions est comparé en ln(x + 1). Le % du volume intracrânien donne exactement le même accord que le volume total : pour un patient, la source et O1 sont divisées par le même ICV, donc leur rapport ne change pas.
+Biais : moyenne des d = ln(source / O1), puis exponentielle (moyenne géométrique des rapports ; 0,98 = 2 % de moins que O1). Limites d'accord : 2,5e et 97,5e centiles des rapports individuels ; elles décrivent la dispersion des patients, ce ne sont **pas** des intervalles de confiance. Entre crochets : intervalle de confiance à 95 % de l'ICC (bootstrap stratifié par scanner). Dernière colonne : test de Kruskal-Wallis, p-valeurs corrigées par Holm sur les 28 tests (une par source et par biomarqueur). Les sujets sans lésion profonde (ou périventriculaire) sont exclus de ce biomarqueur ; le nombre de lésions est comparé en ln(x + 1). Le % du volume intracrânien donne exactement le même accord que le volume total : pour un patient, la source et O1 sont divisées par le même ICV, donc leur rapport ne change pas.
 
 **Volume total**
 
-| Source | Biais (rapport moyen) | Limites d'accord (95 % des patients) | ICC [IC 95 %] | Biais dépendant du site ? (Kruskal-Wallis) |
+| Source | Biais (rapport moyen) | Limites d'accord (95 % des patients) | ICC [IC 95 %] | Biais dépendant du site ? (Kruskal-Wallis, p corrigé par Holm) |
 |---|---|---|---|---|
-| **M1 nnU-Net** (test, 110) | 0,98 | 0,54 à 1,31 | 0,982 [0,975-0,988] | oui (p < 0,001) |
-| M3 seuillage (test, 110) | 1,18 | 0,38 à 6,14 | 0,814 [0,740-0,872] | oui (p < 0,001) |
-| M2 WMH-SynthSeg (test, 110) | 2,44 | 0,70 à 16,3 | 0,372 [0,281-0,469] | non (p = 0,10) |
-| Expert O3 (entraînement, 60) | 0,97 | 0,61 à 1,47 | 0,981 [0,968-0,989] | oui (p < 0,001) |
-| Expert O4 (entraînement, 60) | 0,91 | 0,57 à 1,61 | 0,977 [0,965-0,986] | oui (p < 0,001) |
+| **M1 nnU-Net** (test, 110) | 0,98 | 0,54 à 1,31 | 0,982 [0,975-0,988] | oui (p = 0,004) |
+| M3 seuillage (test, 110) | 1,18 | 0,38 à 6,14 | 0,814 [0,740-0,872] | oui (p = 0,005) |
+| M2 WMH-SynthSeg (test, 110) | 2,44 | 0,70 à 16,3 | 0,372 [0,281-0,469] | non (p = 0,73) |
+| Expert O3 (entraînement, 60) | 0,97 | 0,61 à 1,47 | 0,981 [0,968-0,989] | oui (p = 0,005) |
+| Expert O4 (entraînement, 60) | 0,91 | 0,57 à 1,61 | 0,977 [0,965-0,986] | oui (p = 0,003) |
 
 **Volume périventriculaire**
 
-| Source | Biais (rapport moyen) | Limites d'accord (95 % des patients) | ICC [IC 95 %] | Biais dépendant du site ? (Kruskal-Wallis) |
+| Source | Biais (rapport moyen) | Limites d'accord (95 % des patients) | ICC [IC 95 %] | Biais dépendant du site ? (Kruskal-Wallis, p corrigé par Holm) |
 |---|---|---|---|---|
-| **M1 nnU-Net** (test, 110) | 1,00 | 0,54 à 1,32 | 0,982 [0,974-0,989] | oui (p = 0,002) |
-| M3 seuillage (test, 110) | 1,21 | 0,45 à 4,58 | 0,852 [0,794-0,897] | oui (p < 0,001) |
-| M2 WMH-SynthSeg (test, 110) | 2,53 | 0,77 à 14,3 | 0,349 [0,258-0,438] | non (p = 0,09) |
-| Expert O3 (entraînement, 60) | 0,98 | 0,61 à 1,49 | 0,980 [0,969-0,988] | oui (p < 0,001) |
-| Expert O4 (entraînement, 60) | 0,94 | 0,55 à 1,91 | 0,975 [0,963-0,985] | oui (p < 0,001) |
+| **M1 nnU-Net** (test, 110) | 1,00 | 0,54 à 1,32 | 0,982 [0,974-0,989] | oui (p = 0,020) |
+| M3 seuillage (test, 110) | 1,21 | 0,45 à 4,58 | 0,852 [0,794-0,897] | oui (p = 0,004) |
+| M2 WMH-SynthSeg (test, 110) | 2,53 | 0,77 à 14,3 | 0,349 [0,258-0,438] | non (p = 0,73) |
+| Expert O3 (entraînement, 60) | 0,98 | 0,61 à 1,49 | 0,980 [0,969-0,988] | oui (p = 0,006) |
+| Expert O4 (entraînement, 60) | 0,94 | 0,55 à 1,91 | 0,975 [0,963-0,985] | oui (p = 0,004) |
 
 **Volume profond**
 
-| Source | Biais (rapport moyen) | Limites d'accord (95 % des patients) | ICC [IC 95 %] | Biais dépendant du site ? (Kruskal-Wallis) |
+| Source | Biais (rapport moyen) | Limites d'accord (95 % des patients) | ICC [IC 95 %] | Biais dépendant du site ? (Kruskal-Wallis, p corrigé par Holm) |
 |---|---|---|---|---|
-| **M1 nnU-Net** (test, 110) | 0,87 | 0,31 à 1,40 | 0,964 [0,934-0,985] | oui (p < 0,001) |
-| M3 seuillage (test, 110) | 0,93 | 0,11 à 37,1 | 0,543 [0,389-0,664] | oui (p < 0,001) |
-| M2 WMH-SynthSeg (test, 110) | 2,23 | 0,34 à 61,7 | 0,436 [0,293-0,578] | non (p = 0,22) |
-| Expert O3 (entraînement, 60) | 0,86 | 0,31 à 1,45 | 0,969 [0,947-0,986] | oui (p = 0,002) |
-| Expert O4 (entraînement, 60) | 0,78 | 0,36 à 1,08 | 0,968 [0,948-0,984] | oui (p < 0,001) |
+| **M1 nnU-Net** (test, 110) | 0,87 | 0,31 à 1,40 | 0,964 [0,934-0,985] | oui (p = 0,002) |
+| M3 seuillage (test, 110) | 0,93 | 0,11 à 37,1 | 0,543 [0,389-0,664] | oui (p = 0,004) |
+| M2 WMH-SynthSeg (test, 110) | 2,23 | 0,34 à 61,7 | 0,436 [0,293-0,578] | non (p = 0,80) |
+| Expert O3 (entraînement, 60) | 0,86 | 0,31 à 1,45 | 0,969 [0,947-0,986] | oui (p = 0,020) |
+| Expert O4 (entraînement, 60) | 0,78 | 0,36 à 1,08 | 0,968 [0,948-0,984] | oui (p = 0,006) |
 
 **Nombre de lésions ≥ 10 mm³**
 
-| Source | Biais (rapport moyen) | Limites d'accord (95 % des patients) | ICC [IC 95 %] | Biais dépendant du site ? (Kruskal-Wallis) |
+| Source | Biais (rapport moyen) | Limites d'accord (95 % des patients) | ICC [IC 95 %] | Biais dépendant du site ? (Kruskal-Wallis, p corrigé par Holm) |
 |---|---|---|---|---|
 | **M1 nnU-Net** (test, 110) | 0,82 | 0,58 à 1,16 | 0,890 [0,856-0,917] | oui (p < 0,001) |
-| M3 seuillage (test, 110) | 0,55 | 0,25 à 1,67 | 0,305 [0,207-0,392] | non (p = 0,07) |
-| M2 WMH-SynthSeg (test, 110) | 0,44 | 0,23 à 1,12 | 0,300 [0,236-0,361] | non (p = 0,58) |
-| Expert O3 (entraînement, 60) | 0,79 | 0,48 à 1,15 | 0,847 [0,773-0,898] | oui (p < 0,001) |
-| Expert O4 (entraînement, 60) | 0,80 | 0,51 à 1,15 | 0,877 [0,813-0,921] | non (p = 0,21) |
+| M3 seuillage (test, 110) | 0,55 | 0,25 à 1,67 | 0,305 [0,207-0,392] | non (p = 0,73) |
+| M2 WMH-SynthSeg (test, 110) | 0,44 | 0,23 à 1,12 | 0,300 [0,236-0,361] | non (p = 0,80) |
+| Expert O3 (entraînement, 60) | 0,79 | 0,48 à 1,15 | 0,847 [0,773-0,898] | oui (p = 0,008) |
+| Expert O4 (entraînement, 60) | 0,80 | 0,51 à 1,15 | 0,877 [0,813-0,921] | non (p = 0,80) |
 
 ![Bland-Altman de M1 sur le test](results/figures/bland_altman_test_resencm.png)
 
@@ -435,7 +435,7 @@ Biais : moyenne des d = ln(source / O1), puis exponentielle (moyenne géométriq
 | Amsterdam Philips 3T (inconnu) | 0,98 [0,81-1,13] ; 0,49 (1) | 1,16 [0,90-1,54] ; 0,49 (1) | 2,43 [1,60-3,92] ; 0,002 (0,16) | — | — |
 | Amsterdam GE 1,5T (inconnu) | **1,10** [1,06-1,14] ; 0,004 (0,27) | 0,96 [0,76-1,22] ; 0,92 (1) | 2,84 [1,59-6,22] ; 0,006 (0,39) | — | — |
 
-Les experts n'ont annoté que les 3 scanners d'entraînement. M2 surestime sur tous les scanners (× 1,9 à × 3,3), sans différence démontrée entre eux (Kruskal-Wallis p = 0,10, tableau D2) : son biais est fort mais ne crée pas d'effet de site, contrairement à celui de M1, M3 et des experts.
+Les experts n'ont annoté que les 3 scanners d'entraînement. M2 surestime sur tous les scanners (× 1,9 à × 3,3), sans différence démontrée entre eux (Kruskal-Wallis, p = 0,73 après correction de Holm, tableau D2) : son biais est fort mais ne crée pas d'effet de site, contrairement à celui de M1, M3 et des experts.
 
 Ce tableau ne montre que le volume total et 5 sources. Le biais par scanner des autres biomarqueurs (volumes périventriculaire et profond, nombre de lésions) et des autres sources (M1 DA5, M1 sur les 12 cas de validation) est dans `results/tables/stats_agreement_by_scanner.csv`. La correction de Holm porte sur l'ensemble de ces 116 tests, pas seulement sur ceux affichés ici.
 

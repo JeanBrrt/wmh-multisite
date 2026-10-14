@@ -14,7 +14,8 @@ would create a site effect that has nothing to do with the patients.
        skewed, so bias +/- 1.96 SD would misplace them), bootstrap CI stratified by scanner; parametric
        limits, skewness and Shapiro-Wilk p kept for comparison; all back-transformed to ratios
     2. ICC(A,1), absolute agreement, on ln(value), with a bootstrap CI stratified by scanner
-    3. bias per scanner (bootstrap CI, Wilcoxon against 0, Holm) + Kruskal-Wallis across scanners:
+    3. bias per scanner (bootstrap CI, Wilcoxon against 0, Holm) + Kruskal-Wallis across scanners
+       (one test per rater and biomarker, Holm over all of them):
        does the bias depend on the site?
         v
     results/tables/stats_agreement.csv, stats_agreement_by_scanner.csv,
@@ -248,7 +249,11 @@ def run(cfg: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
     per_site = pd.DataFrame(per_site)
     if len(per_site):
         per_site["p_holm"] = holm(per_site.p_wilcoxon.to_numpy())
-    return pd.DataFrame(overall), per_site
+    overall = pd.DataFrame(overall)
+    tested = overall.get("p_kruskal_site", pd.Series(dtype=float)).notna()
+    if tested.any():  # one Kruskal-Wallis test per rater and biomarker: its own Holm family
+        overall.loc[tested, "p_kruskal_holm"] = holm(overall.loc[tested, "p_kruskal_site"].to_numpy())
+    return overall, per_site
 
 
 def main(argv: list[str] | None = None) -> None:
