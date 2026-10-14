@@ -143,10 +143,7 @@ def prepare(
     if normalization == "zscore":
         z = zscore_in_brain(flair, brain)[box]
     else:
-        labels = None
-        if normalization == "whitestripe":
-            labels = io.load_labels(p["labels"], allowed=tuple(range(256)))
-        z = intensity.normalize(flair, brain, normalization, norm_params or {}, labels)[box]
+        z = intensity.normalize(flair, brain, normalization, norm_params or {})[box]
     depth = depth_mm(brain, spacing)[box]  # computed on the full grid: the box edge is not a border
     return z, depth, float(np.prod(spacing)), box
 

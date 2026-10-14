@@ -7,10 +7,11 @@ mask, since a head mask (with or without the face) would differ between sites:
     none        I / C, C = median of the training brains (one constant for everybody: no per-image
                 correction; the baseline that shows what normalisation brings)
     zscore      (I - median) / (1.4826 MAD), over the brain of the image (as in M3)
-    whitestripe (I - mean) / SD over the normal-appearing white matter of the image (WMH-SynthSeg white
-                matter, labels 2 and 41; the WMH have their own label 77). A variant of WhiteStripe
-                (Shinohara et al. 2014), which finds the white-matter peak in the histogram: here the
-                segmentation gives the white matter directly
+    whitestripe WhiteStripe (Shinohara et al. 2014): the main mode of the smoothed brain histogram (the
+                white matter), then the "stripe" of brain voxels whose quantile lies within +/- tau = 5 %
+                of the mode's quantile; (I - mean) / SD of that stripe. A first version used the mean and
+                SD of the whole WMH-SynthSeg white matter; the narrow stripe leaves out partial-volume and
+                atypical voxels and gave a better threshold (Dice 0.611 vs 0.564)
     histmatch   piecewise-linear mapping of the brain percentiles (1, 10, 20, ..., 90, 99) of the image
                 onto a standard scale learnt on the training images (Nyul and Udupa 2000): each training
                 image's [p1, p99] is mapped linearly onto [0, 100], and the standard landmarks are the
@@ -28,6 +29,7 @@ import numpy as np
 METHODS = ("none", "zscore", "whitestripe", "histmatch")
 PERCENTILES = (1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99)
 WM_LABELS = (2, 41)
+WHITESTRIPE_TAU = 0.05  # half-width of the stripe, in quantiles (WhiteStripe default)
 
 
 def zscore(image: np.ndarray, brain: np.ndarray) -> np.ndarray:
@@ -39,12 +41,28 @@ def zscore(image: np.ndarray, brain: np.ndarray) -> np.ndarray:
     return ((image - med) / mad).astype(np.float32)
 
 
-def whitestripe(image: np.ndarray, brain: np.ndarray, labels: np.ndarray) -> np.ndarray:
-    wm = np.isin(labels, WM_LABELS) & brain
-    if wm.sum() < 100:
-        raise ValueError("too few white-matter voxels for WhiteStripe")
-    mu, sd = float(image[wm].mean()), float(image[wm].std())
-    return ((image - mu) / sd).astype(np.float32)
+def whitestripe(
+    image: np.ndarray, brain: np.ndarray, labels: np.ndarray | None = None, tau: float = WHITESTRIPE_TAU
+) -> np.ndarray:
+    """WhiteStripe: mean and SD of the voxels around the main mode of the brain histogram.
+
+    The histogram (1000 bins between the 0.5th and 99.5th brain percentiles) is smoothed, its main mode
+    taken as the white-matter intensity, and the stripe is the brain voxels whose quantile lies within
+    ``tau`` of that mode's quantile. ``labels`` is unused (kept for a uniform call).
+    """
+    from scipy import ndimage
+
+    v = image[brain].astype(np.float64)
+    lo, hi = np.percentile(v, [0.5, 99.5])
+    hist, edges = np.histogram(v, bins=1000, range=(lo, hi))
+    smooth = ndimage.gaussian_filter1d(hist.astype(np.float64), 8)
+    mode = 0.5 * (edges[:-1] + edges[1:])[int(np.argmax(smooth))]
+    q = float((v < mode).mean())
+    a, b = np.quantile(v, [max(q - tau, 0.0), min(q + tau, 1.0)])
+    stripe = v[(v >= a) & (v <= b)]
+    if stripe.size < 100 or stripe.std() <= 0:
+        raise ValueError("WhiteStripe: stripe too small or flat")
+    return ((image - stripe.mean()) / stripe.std()).astype(np.float32)
 
 
 def landmarks(image: np.ndarray, brain: np.ndarray) -> np.ndarray:
@@ -81,9 +99,7 @@ def normalize(
     if method == "zscore":
         return zscore(image, brain)
     if method == "whitestripe":
-        if labels is None:
-            raise ValueError("whitestripe needs the tissue labels")
-        return whitestripe(image, brain, labels)
+        return whitestripe(image, brain)
     if method == "histmatch":
         return histmatch(image, brain, np.asarray(params["standard"]))
     raise ValueError(f"unknown normalisation {method!r} (expected one of {METHODS})")

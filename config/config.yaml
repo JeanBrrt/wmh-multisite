@@ -211,7 +211,7 @@ segmentation:
       min_size_mm3: [0, 10, 20, 40, 80, 160, 320]       # m: smallest connected component kept (26-connectivity)
     t_grid_by_normalization:      # threshold grid [start, stop, step] on the scale of each normalisation
       none: [0.5, 3.5, 0.1]         # I / median of the training brains (lesion medians 0.75 to 2.4 on train)
-      whitestripe: [1.5, 9.0, 0.25] # (I - mean NAWM) / SD NAWM (lesion medians 3.8 to 6.1)
+      whitestripe: [5.0, 80.0, 1.5] # (I - mean) / SD of the stripe around the WM mode (lesion medians ~35-50)
       histmatch: [80, 140, 2]       # standard scale, brain p1 -> 0, p99 -> 100 (lesion medians 95 to 125)
     jobs: 2
 

@@ -30,11 +30,18 @@ def test_zscore_and_whitestripe_cancel_a_scanner_gain_and_offset():
         assert np.allclose(za[brain], zb[brain], atol=1e-3)
 
 
-def test_whitestripe_puts_white_matter_at_zero_mean_unit_sd():
-    image, brain, labels = brain_image()
-    z = hi.whitestripe(image, brain, labels)
-    wm = np.isin(labels, (2, 41)) & brain
-    assert z[wm].mean() == pytest.approx(0, abs=1e-5) and z[wm].std() == pytest.approx(1, abs=1e-4)
+def test_whitestripe_centres_the_main_tissue_mode():
+    # brain mostly white matter (100 +/- 5) with a minority of brighter tissue (130 +/- 5) and lesions
+    rng = np.random.default_rng(0)
+    values = np.concatenate(
+        [rng.normal(100, 5, 160000), rng.normal(130, 5, 40000), rng.normal(200, 10, 4000)]
+    )
+    image = values.reshape(1, 1, -1).astype(np.float32)
+    brain = np.ones(image.shape, bool)
+    z = hi.whitestripe(image, brain)
+    wm = z[0, 0, :160000]  # a brain-sized sample: the histogram mode is well defined
+    assert abs(float(np.median(wm))) < 0.5  # the white-matter mode sits at 0
+    assert float(np.median(z[0, 0, -4000:])) > 10  # lesions far above it: the stripe SD is narrow
 
 
 def test_rule_a_outside_the_brain_does_not_change_the_parameters():
@@ -68,9 +75,7 @@ def test_none_is_one_constant_learnt_on_train():
     assert np.allclose(hi.normalize(image, brain, "none", params), image / params["constant"])
 
 
-def test_unknown_method_and_missing_labels():
+def test_unknown_method():
     image, brain, _ = brain_image()
     with pytest.raises(ValueError, match="unknown normalisation"):
         hi.normalize(image, brain, "foo", {})
-    with pytest.raises(ValueError, match="tissue labels"):
-        hi.normalize(image, brain, "whitestripe", {})

@@ -156,7 +156,7 @@ On calcule les biomarqueurs suivant pour chaque sujet et chaque source de segmen
 
 ### 6. Harmonisation
 
-**Normalisation d'intensité**, testée par son effet sur le seuillage, site par site : sans normalisation, le seuillage s'effondre (Dice 0,203, 0,00 sur 2 scanners) ; les trois normalisations par image suppriment l'effet du site, et la plus simple, le z-score robuste, est la meilleure (0,595) ([tableau E1](#e1)).
+**Normalisation d'intensité**, testée par son effet sur le seuillage, site par site : sans normalisation, le seuillage s'effondre (Dice 0,203, 0,00 sur 2 scanners) ; les trois normalisations par image suppriment l'effet du site. La meilleure est **WhiteStripe** (0,611), qui cale chaque image sur une bande étroite d'intensités autour du pic de la substance blanche, devant le z-score robuste (0,595 ; différence +0,016, p = 0,0009 après correction de Holm) ; l'appariement d'histogrammes, qui impose la même forme d'histogramme à tous les cerveaux, déforme le contraste des lésions (0,522) ([tableau E1](#e1)). M3 garde le z-score, la référence classique la plus simple.
 
 **Signature de site et ComBat** : 20 caractéristiques de la substance blanche saine (FLAIR et T1), **classifieur de site** en validation croisée (5 plis), **ComBat** (neuroHarmonize) appris dans les plis d'entraînement, avec la charge lésionnelle et l'ICV comme covariables protégées.
 
@@ -463,8 +463,8 @@ Chaque carte est comparée à celle de O1 **sur les mêmes sujets** : les 110 ca
 | Normalisation de la FLAIR | Dice du seuillage | Effet du site sur le Dice (Kruskal-Wallis) |
 |---|---|---|
 | Aucune | 0,203 | fort (p < 0,001) ; Dice 0,00 sur 2 scanners |
-| **z-score robuste** | **0,595** | aucun (p = 0,90) |
-| WhiteStripe | 0,564 | aucun (p = 0,94) |
+| z-score robuste (M3) | 0,595 | aucun (p = 0,90) |
+| **WhiteStripe** | **0,611** | aucun (p = 0,93) |
 | Appariement d'histogrammes | 0,522 | aucun (p = 0,52) |
 
 <a id="e2"></a>
