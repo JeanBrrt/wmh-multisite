@@ -33,7 +33,6 @@ RUN uv sync --frozen --no-install-project --no-dev $UV_EXTRAS
 COPY src ./src
 COPY config ./config
 COPY workflow ./workflow
-COPY scripts ./scripts
 COPY containers/wmh_multisite_trainers.py ./containers/
 RUN uv sync --frozen --no-dev $UV_EXTRAS \
  && if python -c "import nnunetv2" 2>/dev/null; then \

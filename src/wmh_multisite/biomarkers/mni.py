@@ -4,7 +4,7 @@ Where do the WMH lie, in a common space, for each site and each segmentation met
 
     lesion mask of a source (FLAIR grid; label 2 of O1 removed, as everywhere)
       1. -> raw T1 grid: inverse of the rigid transform
-      2. -> MNI152NLin2009cAsym 2 mm: affine + SyN CC deformation
+      2. -> MNI152NLin2009cAsym 2 mm: affine + SyN CC deformation (``preproc.mni``)
          ``linear`` interpolation both times: a 2 mm voxel half covered by a lesion reads 0.5 (the
          covered fraction is kept instead of being rounded to 0 or 1)
       -> sub-XXX_space-MNI152NLin2009cAsym_res-2_label-WMH_desc-<source>_probseg.nii.gz
@@ -42,6 +42,7 @@ from wmh_multisite.biomarkers.volumes import remove_other_pathology
 from wmh_multisite.config import load_config, resolve_path
 from wmh_multisite.evaluate.interobserver import manual
 from wmh_multisite.preproc import PIPELINE
+from wmh_multisite.preproc import mni as preproc_mni
 from wmh_multisite.utils import io
 
 log = logging.getLogger(__name__)
@@ -49,20 +50,16 @@ SPACE = "MNI152NLin2009cAsym"
 
 
 def registration_paths(cfg: dict[str, Any], sub: str) -> dict[str, Path]:
-    m = cfg["biomarkers"]["mni"]
     d = resolve_path(cfg, "derivatives") / PIPELINE
-    reg = d / m["registration_dir"] / f"{sub}__{m['variant']}"
-    stem = f"{sub}_from-T1w_to-{SPACE}_mode-image"
     return {
         "t1": resolve_path(cfg, "bids") / sub / "anat" / f"{sub}_T1w.nii.gz",
         "rigid": d / sub / "anat" / f"{sub}_from-T1w_to-FLAIR_mode-image_xfm.mat",
-        "affine": reg / f"{stem}_desc-affine_xfm.mat",
-        "warp": reg / f"{stem}_desc-warp_xfm.nii.gz",
+        **preproc_mni.registration_paths(cfg, sub),
     }
 
 
 def output_path(cfg: dict[str, Any], sub: str, source: str) -> Path:
-    res = cfg["biomarkers"]["mni"]["resolution"]
+    res = cfg["preproc"]["mni"]["resolution"]
     return (
         resolve_path(cfg, "derivatives")
         / PIPELINE
@@ -198,11 +195,7 @@ def main(argv: list[str] | None = None) -> None:
     from wmh_multisite.preproc import atlas
 
     m = cfg["biomarkers"]["mni"]
-    cfg_tpl = {
-        **cfg,
-        "preproc": {**cfg["preproc"], "atlas": {**cfg["preproc"]["atlas"], "resolution": m["resolution"]}},
-    }
-    tpl = atlas.template_files(cfg_tpl)
+    tpl = atlas.template_files(preproc_mni.template_cfg(cfg))
     part = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t").set_index("participant_id")
     tasks, skipped = [], []
     for sub, row in part.iterrows():

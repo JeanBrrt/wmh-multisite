@@ -23,8 +23,8 @@ jobs:
 
       - name: Lint (ruff)
         run: |
-          uv run ruff check src tests scripts containers
-          uv run ruff format --check src tests scripts containers
+          uv run ruff check src tests containers
+          uv run ruff format --check src tests containers
 
       - name: Workflow syntax (Snakemake)
         run: uv run snakemake -s workflow/Snakefile --lint || true   # advisory: the DAG needs the data

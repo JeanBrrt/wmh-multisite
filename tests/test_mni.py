@@ -45,3 +45,15 @@ def test_map_agreement_correlates_each_method_with_o1():
     assert abs(a.loc["N", "pearson_r_vs_O1"]) < 0.3
     assert a.loc["M", "mean_freq"] == pytest.approx(2 * a.loc["M", "mean_freq_O1"])
     assert isinstance(a, pd.DataFrame) and "O1" not in a.index
+
+
+def test_mni_registration_paths_and_scanner_order(tmp_path):
+    from wmh_multisite.config import load_config
+    from wmh_multisite.preproc import mni
+
+    cfg = load_config()
+    paths = mni.registration_paths(cfg, "sub-007")
+    assert {p.parent.name for p in paths.values()} == {"sub-007"}
+    assert paths["affine"].parent.parent.name == cfg["preproc"]["mni"]["output_dir"]
+    part = pd.DataFrame({"participant_id": ["a1", "a2", "a3", "b1", "c1", "c2"], "scanner": list("aaabcc")})
+    assert mni.interleaved(part) == ["a1", "b1", "c1", "a2", "c2", "a3"]

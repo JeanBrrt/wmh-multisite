@@ -149,13 +149,13 @@ rule agreement:  # Bland-Altman, ICC, bias per site
     output: f"{TABLES}/stats_agreement.csv", f"{TABLES}/stats_agreement_by_scanner.csv", f"{TABLES}/stats_agreement_shared.csv"
     shell: f"{PY}.biomarkers.agreement"
 
-rule syn_mni:  # SyN CC on the 2 mm MNI template, all subjects (~8 h with 12 threads)
+rule mni_registration:  # SyN CC on the 2 mm MNI template, all subjects (~8 h)
     input: ancient(f"{DER}/n4_report.csv")
-    output: touch(FLAGS + "/syn_cc2mm.done")
-    shell: "uv run python scripts/syn_benchmark.py --subjects all --variants cc2mm_100-70-50-20 --jobs 4 --threads 3"
+    output: f"{TABLES}/mni_registration_qc.csv"
+    shell: f"{PY}.preproc.mni"
 
 rule mni_maps:  # lesion frequency maps per site and source
-    input: FLAGS + "/syn_cc2mm.done", f"{TABLES}/biomarkers.csv"
+    input: ancient(f"{TABLES}/mni_registration_qc.csv"), f"{TABLES}/biomarkers.csv"
     output: f"{TABLES}/mni_map_agreement.csv"
     shell: f"{PY}.biomarkers.mni"
 
