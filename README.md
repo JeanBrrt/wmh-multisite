@@ -6,8 +6,9 @@
 
 Données : challenge **MICCAI WMH 2017**, 170 IRM FLAIR + T1 de **5 scanners** sur 3 sites (60 sujets d'entraînement, 110 de test dont 20 issus de 2 scanners absents de l'entraînement).
 
-> [!NOTE]
-> **[Rapport complet (PDF, en français)](report/rapport.pdf)** : démarche, méthodes statistiques et ensemble des résultats. Ce README n'en donne qu'un aperçu.
+Ce travail avait pour but de me former au traitement automatique de l'imagerie médicale en allant des images brutes aux résultats statistiques (formats, prétraitements, segmentation, métriques, tests statistiques et harmonisation). L'accent a été mis sur la rigueur de l'évaluation et sur la reproductibilité, autour de quatre questions détaillées plus bas.
+
+Un [rapport (PDF, en français)](report/rapport.pdf) détaille l'ensemble de mes démarches, méthodes et résultats. Ce README n'en donne qu'un bref aperçu.
 
 ## Questions
 
@@ -40,15 +41,11 @@ Quand les images viennent de centres, d'appareils et de protocoles différents, 
 | **Harmonisation** | Le scanner est deviné à 90 % depuis la substance blanche saine, 73 % après normalisation, **28 % après ComBat** (hasard 20 %). Le lien avec la charge lésionnelle est conservé. |
 | **Contrôle qualité** | Presque toutes les segmentations dégradées par le bruit ou le champ de biais sont signalées (78 sur 83), mais **76 des 99 segmentations dégradées par le mouvement passent inaperçues** (principale limite). |
 
-![Classement MICCAI WMH 2017](results/figures/leaderboard.png)
-
-*Score officiel du challenge des 57 équipes publiées, chaque méthode du projet insérée seule (plus bas = meilleur).*
-
 ## Limites
 
 - Un seul pli d'entraînement nnU-Net, sans ensemble (budget GPU).
-- 20 cas de scanners inconnus, tous d'Amsterdam ; plafond humain mesuré sur 12 cas de scanners vus.
-- Aucune donnée démographique : un écart entre sites peut venir de la population autant que du scanner.
+- 20 cas de scanners inconnus, tous d'Amsterdam avec le plafond humain mesuré sur 12 cas de scanners vus.
+- Aucune donnée démographique donc un écart entre sites peut venir de la population autant que du scanner.
 - Le mouvement est mal détecté par le contrôle qualité en FLAIR.
 
 ## Reproduire
@@ -69,11 +66,11 @@ uv run pytest                                            # 165 tests, données s
 ```
 config/config.yaml          paramètres
 src/wmh_multisite/          data, preproc, qc, seg, evaluate, biomarkers, harmonize, viz
-workflow/Snakefile          chaîne complète (25 règles)
+workflow/Snakefile          chaîne complète
 kaggle/                     notebooks des deux étapes externes
 containers/                 Docker, trainers nnU-Net du projet
 tests/                      tests pytest
-results/tables, figures     résultats agrégés (aucune image de patient)
+results/tables, figures     résultats agrégés
 ```
 
 **Outils** : nibabel, SimpleITK, ANTsPy, HD-BET, TemplateFlow, nnU-Net v2, WMH-SynthSeg, PyTorch, TorchIO, scikit-learn, SciPy, pandas, neuroHarmonize, uv, Snakemake, pytest, ruff, GitHub Actions, Docker.
