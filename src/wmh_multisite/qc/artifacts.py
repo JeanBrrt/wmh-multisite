@@ -1,29 +1,27 @@
-"""Does the QC detector catch degraded images? Simulated artifacts.
+"""Does the QC catch degraded images? A test with simulated artifacts.
 
-The organizers picked the challenge images, so few if any are really bad. To test the detector of
-``qc.outliers`` we make bad ones: clean raw images get TorchIO artifacts of increasing strength, their
-IQMs are recomputed and judged by the detector fitted on the real images. One modality at a time
-(``--modality``): the FLAIR, and the T1, where CJV (MRIQC's motion-sensitive metric) is judged.
+The challenge images were selected by the organizers, so few of them are really bad. To test the detector of
+qc.outliers we create bad images ourselves: clean raw images receive TorchIO artifacts (noise, motion, bias
+field, ghosting) at four increasing levels, then their IQMs are recomputed and judged by the detector fitted
+on the real images. The detection rate is the share of degraded images that are not classed as usable, and
+level 0 gives the false-alarm rate.
 
-    clean raw images of one modality (``n_per_scanner`` usable TEST subjects per scanner: the same
-    subjects as ``qc.robustness``, so that detection and segmentation are read on the same images)
-      x artifact (noise, motion, bias field, ghosting) x level (0 = none ... 4 = strong, ``qc.artifacts``)
-          image / brain median -> TorchIO transform (fixed seed) -> x brain median
-      -> N4 on the degraded image (same settings as the pipeline), as a real image would get
-      -> IQMs (MRIQC protocol; same masks: the artifacts do not move the anatomy, except motion slightly)
-      -> z against the CLEAN images of the same scanner, Isolation Forest fitted on the clean images
-      -> class; detection rate = share of images not "usable", per artifact and level
-      v
-    results/tables/qc_artifacts.csv, results/figures/qc_artifact_detection.png
+The images are those of n_per_scanner usable test subjects per scanner, the same as in qc.robustness, so that
+detection and segmentation can be read on the same images. Each degraded image goes through N4 with the
+pipeline settings, like a real one would, and its IQMs follow the MRIQC protocol. Its z-scores are computed
+against the clean images of the same scanner.
 
-Level 0 gives the false-alarm rate. A simulated bias shows in ``inu_range`` (N4 estimates it), not in
-the tissue metrics, which are measured after N4 as in MRIQC. The other modality keeps its real IQMs,
-and the regions (brain, tissues, transform) are those of the clean image: this tests the metrics, not
-HD-BET, the registration or the segmentation on degraded images.
+A simulated bias shows in inu_range, which N4 estimates, and not in the tissue metrics, which are measured
+after N4 as in MRIQC. The other modality keeps its real IQMs and the regions (brain, tissues, transform) are
+those of the clean image, so this tests the metrics and not HD-BET, the registration or the segmentation. Only
+one modality is degraded at a time: the FLAIR, or the T1 where the motion-sensitive CJV is used.
+
+Outputs: results/tables/qc_artifacts.csv (qc_artifacts_T1w.csv for the T1) and
+results/figures/qc_artifact_detection.png.
 
 Usage:
-    uv run python -m wmh_multisite.qc.artifacts                    # FLAIR -> qc_artifacts.csv
-    uv run python -m wmh_multisite.qc.artifacts --modality T1w     # T1 -> qc_artifacts_T1w.csv
+    uv run python -m wmh_multisite.qc.artifacts                    # FLAIR
+    uv run python -m wmh_multisite.qc.artifacts --modality T1w     # T1
 """
 
 from __future__ import annotations
@@ -47,7 +45,7 @@ log = logging.getLogger(__name__)
 
 
 def choose_subjects(cfg: dict[str, Any], n_per_scanner: int) -> list[str]:
-    """The first ``n_per_scanner`` usable test subjects of each scanner (shared with ``qc.robustness``)."""
+    """The first n_per_scanner usable test subjects of each scanner (also used by qc.robustness)."""
     tables = resolve_path(cfg, "results") / "tables"
     flags = pd.read_csv(tables / "qc_flags.csv")
     part = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t").set_index("participant_id")
@@ -64,7 +62,7 @@ def degrade(
     seed: int,
     affine: np.ndarray | None = None,
 ) -> np.ndarray:
-    """``image`` with one TorchIO artifact of the given strength (``level`` 0 returns the image unchanged)."""
+    """Apply one TorchIO artifact at the given level (level 0 returns the image unchanged)."""
     if level == 0:
         return image.copy()
     import torch
@@ -88,7 +86,7 @@ def degrade(
 
 
 def n4_field(image: np.ndarray, brain: np.ndarray, reference: Path) -> np.ndarray:
-    """N4 field of an in-memory image, with the same code and settings as ``preproc.bias``."""
+    """N4 field of an in-memory image, with the same code and settings as preproc.bias."""
     from wmh_multisite.preproc.bias import n4_correct
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -97,7 +95,9 @@ def n4_field(image: np.ndarray, brain: np.ndarray, reference: Path) -> np.ndarra
 
 
 def badness(rows: pd.DataFrame, clean: pd.DataFrame, modality: str) -> pd.DataFrame:
-    """z of degraded IQMs against the clean images of the same scanner and modality (positive = worse)."""
+    """z-scores of the degraded IQMs against the clean images of the same scanner and modality (positive is
+    worse).
+    """
     ref = clean[clean.modality == modality]
     out = pd.DataFrame(index=rows.index)
     for m in JUDGED[modality]:
@@ -111,7 +111,7 @@ def badness(rows: pd.DataFrame, clean: pd.DataFrame, modality: str) -> pd.DataFr
 
 
 def images(cfg: dict[str, Any], sub: str, modality: str) -> dict[str, Any]:
-    """Raw image, brain, tissue labels and voxel size of one modality, on its own grid (as in ``qc.iqm``)."""
+    """Raw image, brain mask, tissue labels and voxel size of one modality, on its own grid."""
     p = subject_paths(cfg, sub)
     nii = io.load(p[modality])
     if modality == "FLAIR":

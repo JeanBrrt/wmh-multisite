@@ -1,18 +1,18 @@
-"""Normal-appearing white matter features, per subject.
+"""Features of the normal-appearing white matter, per subject.
 
-The same tissue reads differently on each site. These are the features a multi-site study would
-compare between patients, and ``harmonize.combat`` tests them for a site signature before and after
+The same tissue does not have the same intensity on every site. These are the kind of features a multi-site
+study would compare between patients, and harmonize.combat checks them for a site signature before and after
 harmonisation.
 
-    FLAIR N4 and T1 N4 (on the FLAIR grid), HD-BET brain mask
-    tissues of WMH-SynthSeg: white matter (2, 41; the WMH have their own label 77, so this is the
-    normal-appearing white matter, NAWM), cortex (3, 42)
-    intensity scale: ``none`` (I / median of the training brains, one constant per modality) or
-    ``zscore`` (per-image robust z inside the brain, as M3), from ``harmonize.intensity``
-      -> per modality: NAWM percentiles 5 / 25 / 50 / 75 / 95, IQR, skewness, kurtosis;
-         cortex median and cortex - NAWM median (grey/white contrast)
-      v
-    results/tables/nawm_features.csv (one row per subject and scale)
+The tissues come from WMH-SynthSeg: white matter (labels 2 and 41, which exclude the WMH since they have their
+own label 77) and cortex (labels 3 and 42). For the FLAIR and the T1, both N4-corrected and on the FLAIR grid,
+we take the 5th, 25th, 50th, 75th and 95th percentiles of the white matter, its IQR, skewness and kurtosis,
+the median of the cortex and the grey/white contrast.
+
+Two intensity scales are used: none (each image divided by the median of the training brains, one constant per
+modality) and zscore (robust z-score inside the brain, as for M3).
+
+Output: results/tables/nawm_features.csv, one row per subject and scale.
 
 Usage:
     uv run python -m wmh_multisite.harmonize.features
@@ -81,7 +81,7 @@ def subject_features(task: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def training_constants(cfg: dict[str, Any], train: list[str]) -> dict[str, dict[str, float]]:
-    """``none`` scale: one constant per modality, the median of the training brains."""
+    """Constants of the 'none' scale: the median of the training brains for each modality."""
     d = resolve_path(cfg, "derivatives") / PIPELINE
     out = {}
     for modality, pattern in MODALITIES.items():

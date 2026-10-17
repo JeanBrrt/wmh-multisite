@@ -1,12 +1,9 @@
 """Summary figures of the evaluation.
 
-    results/figures/
-      dice_by_method_and_scanner.png   mean Dice and bootstrap 95 % CI per method and scanner
-      seen_vs_unseen.png               Dice and HD95, scanners seen vs unseen in training, with CIs
-      leaderboard.png                  official overall rank score of the 57 published teams + ours
-    results/tables/leaderboard_positions.csv
-
-Only aggregated numbers are drawn (no patient image).
+Writes three figures to results/figures/: the mean Dice with its 95 % CI per method and scanner
+(dice_by_method_and_scanner.png), Dice and HD95 on seen versus unseen scanners (seen_vs_unseen.png), and the
+position of our methods among the 57 published teams (leaderboard.png). Our positions are also saved in
+results/tables/leaderboard_positions.csv. Only aggregated numbers are shown, never a patient image.
 
 Usage:
     uv run python -m wmh_multisite.viz.figures

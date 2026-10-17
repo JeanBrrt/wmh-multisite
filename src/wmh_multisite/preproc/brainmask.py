@@ -1,17 +1,16 @@
-"""HD-BET brain masks on the local GPU.
+"""HD-BET brain masks, computed on the local GPU.
 
-HD-BET (Isensee et al., Hum Brain Mapp 2019) is a pretrained nnU-Net for brain extraction; we only run
-inference, on the raw 3D T1 at 1 mm. The project environment has a CPU-only PyTorch, so HD-BET runs in
-a temporary uv environment through ``hdbet_worker.py``, one batch per worker process, under the memory
-watchdog. Subjects that already have a mask are skipped, so an interrupted run can just be restarted.
+HD-BET (Isensee et al., 2019) is a pretrained network for brain extraction. We only run inference, on the raw
+1 mm T1. The project environment has a CPU-only PyTorch, so HD-BET runs in a temporary uv environment through
+hdbet_worker.py, one batch per process, under the memory watchdog. Subjects that already have a mask are
+skipped, so an interrupted run can simply be restarted.
 
-Each mask is checked (T1 grid, values 0/1), carried onto the FLAIR grid with the rigid transform
-(``genericLabel``) and summarized in a QC table.
+Each mask is checked (T1 grid, values 0 and 1), carried onto the FLAIR grid with the rigid transform and
+summarised in results/tables/brainmask_qc.csv.
 
-Outputs, in ``data/derivatives/wmh-multisite/sub-XXX/anat/``:
-    sub-XXX_space-T1w_desc-brain_mask.nii.gz      HD-BET mask on the T1 grid
-    sub-XXX_space-FLAIR_desc-brain_mask.nii.gz    the same mask on the FLAIR grid
-and ``results/tables/brainmask_qc.csv``.
+Outputs, in data/derivatives/wmh-multisite/sub-XXX/anat/:
+    sub-XXX_space-T1w_desc-brain_mask.nii.gz      mask on the T1 grid
+    sub-XXX_space-FLAIR_desc-brain_mask.nii.gz    same mask on the FLAIR grid
 
 Usage:
     uv run python -m wmh_multisite.preproc.brainmask                    # all subjects
@@ -57,7 +56,7 @@ def mask_paths(cfg: dict[str, Any], sub: str) -> dict[str, Path]:
 
 
 def worker_command(cfg: dict[str, Any], job_file: Path) -> list[str]:
-    """``uv run`` command that executes the worker in the temporary CUDA environment."""
+    """uv run command that executes the worker in the temporary CUDA environment."""
     rt = cfg["preproc"]["brainmask"]["runtime"]
     cmd = ["uv", "run", "--no-project", "--python", str(rt["python"])]
     for package in rt["packages"]:
@@ -75,7 +74,7 @@ def worker_command(cfg: dict[str, Any], job_file: Path) -> list[str]:
 
 
 def accept_mask(cfg: dict[str, Any], sub: str, produced: Path) -> Path:
-    """Check a mask written by HD-BET and store it in the derivatives (uint8, geometry of the T1)."""
+    """Check a mask written by HD-BET and save it in the derivatives (uint8, with the T1 geometry)."""
     p = mask_paths(cfg, sub)
     if not io.same_grid(produced, p["t1w"]):
         raise ValueError(f"{sub}: the HD-BET mask is not on the grid of {p['t1w'].name}")
@@ -140,7 +139,7 @@ def run_hdbet(cfg: dict[str, Any], subjects: list[str]) -> list[dict[str, Any]]:
 def to_flair_grid(cfg: dict[str, Any], sub: str, overwrite: bool = False) -> Path | None:
     """Carry the T1-grid brain mask onto the FLAIR grid with the rigid transform.
 
-    Returns None if the subject has not been registered yet (its mask stays on the T1 grid).
+    Returns None if the subject has not been registered yet, in which case its mask stays on the T1 grid.
     """
     p = mask_paths(cfg, sub)
     if not p["xfm"].is_file():

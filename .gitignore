@@ -1,9 +1,3 @@
-# --- Personal documents (CV, job offer) and working notes kept local ---
-ressource/
-justification.md
-ROADMAP.md
-notebooks/
-
 # --- Data: never versioned (CC BY-NC 4.0, size). Keep the folder skeleton only ---
 data/**
 !data/**/

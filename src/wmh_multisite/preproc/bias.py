@@ -1,18 +1,16 @@
 """N4 bias field correction with the HD-BET brain mask.
 
-Runs last in the preprocessing, once the brain masks exist on both grids. The raw FLAIR and the raw
-3D T1 (1 mm, not resampled) are corrected with N4 (Tustison et al. 2010), which fits a smooth
-multiplicative field on the voxels of a mask. The HD-BET brain mask is used because it means the same
-thing on every site; an Otsu head mask changed with the scanner contrast. The corrected T1 is then
-resampled onto the FLAIR grid as the second nnU-Net channel.
+This is the last preprocessing step, once the brain masks exist on both grids. The raw FLAIR and the raw 1 mm
+T1 are corrected with N4 (Tustison et al., 2010), which fits a smooth multiplicative field on the voxels of a
+mask. We use the HD-BET brain mask because it means the same thing on every site, whereas an Otsu head mask
+changed with the scanner contrast (preproc.n4.mask: otsu still gives that earlier variant). The corrected T1
+is then resampled onto the FLAIR grid to serve as the second nnU-Net channel.
 
-``preproc.n4.mask: otsu`` reproduces the earlier Otsu variant (kept in
-``data/derivatives/wmh-multisite-otsu`` for comparison).
-
-Outputs, in ``data/derivatives/wmh-multisite/sub-XXX/anat/``:
-    sub-XXX_desc-n4_FLAIR.nii.gz             corrected FLAIR (float32, FLAIR grid)
+Outputs, in data/derivatives/wmh-multisite/sub-XXX/anat/:
+    sub-XXX_desc-n4_FLAIR.nii.gz             corrected FLAIR (float32)
     sub-XXX_desc-biasfield_FLAIR.nii.gz      estimated field (corrected = raw / field)
-    sub-XXX_desc-n4_T1w.nii.gz, sub-XXX_desc-biasfield_T1w.nii.gz   same for the T1 (T1 grid)
+    sub-XXX_desc-n4_T1w.nii.gz               corrected T1, on its own grid
+    sub-XXX_desc-biasfield_T1w.nii.gz        T1 field
     sub-XXX_space-FLAIR_desc-n4_T1w.nii.gz   corrected T1 resampled onto the FLAIR grid
 
 Usage:
@@ -48,11 +46,10 @@ MODALITIES = {"FLAIR": "FLAIR", "T1w": "T1w"}  # BIDS suffix -> space label of i
 def head_mask(volume: np.ndarray) -> np.ndarray:
     """Rough head mask: Otsu threshold, largest connected component, holes filled.
 
-    - Otsu separates the two modes of the histogram (air near 0, head much brighter).
-    - Keeping the largest 3D component removes isolated bright voxels in the air (noise, ghosting).
-    - Holes are filled in 3D (cavities enclosed in the volume), then slice by slice along each axis:
-      dark structures inside the head (ventricles in FLAIR, CSF, bone) often touch the border of
-      the field of view through the first or last slice, so a 3D fill alone leaves them out.
+    Otsu separates the air from the much brighter head, and keeping the largest component removes isolated
+    bright voxels in the air. Holes are filled in 3D and then slice by slice along each axis, because dark
+    structures inside the head (ventricles on the FLAIR, CSF, bone) often reach the edge of the field of view,
+    where a 3D fill alone would miss them.
     """
     above = volume > threshold_otsu(volume)
     labels, n = ndimage.label(above)
@@ -70,11 +67,10 @@ def head_mask(volume: np.ndarray) -> np.ndarray:
 def n4_correct(
     image_path: Path, mask: np.ndarray | None = None, shrink_factor: int = 4
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return (corrected, field, mask) as arrays in the voxel order of the file.
+    """Return the corrected image, the field and the mask, as arrays in the voxel order of the file.
 
-    ``mask`` (same voxel order as the file) defines where N4 estimates the field; None = Otsu head mask.
-    ``new_image_like`` gives the mask the image's origin, spacing and direction, so no bare array
-    crosses libraries. The correction is raw / field, so the stored field and image stay consistent.
+    mask sets where N4 estimates the field (None means the Otsu head mask). The correction is raw / field, so
+    the saved field and the saved image always agree.
     """
     image = ants.image_read(str(image_path), pixeltype="float")
     mask = head_mask(image.numpy()) if mask is None else mask.astype(bool)
@@ -94,10 +90,10 @@ def _anat_dir(cfg: dict[str, Any], sub: str) -> Path:
 
 
 def correct_subject(sub: str, config_path: str | None = None, shrink_factor: int = 4) -> list[dict[str, Any]]:
-    """N4 on the FLAIR and the T1w of one subject, then the T1 onto the FLAIR grid. Returns QC rows.
+    """N4 on the FLAIR and the T1 of one subject, then the T1 resampled onto the FLAIR grid.
 
-    Skips images already corrected. Kept at module level with plain arguments so that it can run in a
-    guarded child process.
+    Images that are already corrected are skipped. The function lives at module level and takes plain
+    arguments so that it can run in a guarded child process. Returns the QC rows.
     """
     from wmh_multisite.preproc.register import resample_onto_flair  # avoids a circular import
 
@@ -153,7 +149,9 @@ def correct_subject(sub: str, config_path: str | None = None, shrink_factor: int
 
 
 def _qc(field: np.ndarray, mask: np.ndarray) -> dict[str, float]:
-    """Mask coverage and spread of the bias field inside the mask (p5/p95 relative to the median)."""
+    """Mask coverage and spread of the field inside the mask (5th and 95th percentiles relative to the
+    median).
+    """
     inside = field[mask]
     return {
         "mask_fraction": round(float(mask.mean()), 3),
@@ -192,7 +190,7 @@ def run(
     subjects: list[str] | None = None,
     config_path: str | None = None,
 ) -> Path:
-    """Correct every selected subject, at most ``jobs`` at a time, each in a guarded process."""
+    """Correct every selected subject, at most jobs at a time, each in a guarded process."""
     participants = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t")
     selected = participants[participants.split.isin(splits)].participant_id.tolist()
     if subjects:

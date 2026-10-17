@@ -1,19 +1,20 @@
-"""Rigid registration of the raw 3D T1 to the raw FLAIR.
+"""Rigid registration of the raw T1 to the raw FLAIR.
 
-Preprocessing order: HD-BET mask on the raw T1 -> this registration -> mask carried onto the FLAIR
-grid -> N4 with the brain masks -> N4 T1 resampled onto the FLAIR grid. Registering the raw images
-keeps the transform independent of N4; mutual information copes with the smooth bias field.
+The preprocessing runs in this order: HD-BET mask on the raw T1, this registration, the mask carried onto the
+FLAIR grid, N4 with the brain masks, and finally the N4 T1 resampled onto the FLAIR grid. Registering the raw
+images keeps the transform independent of N4, and mutual information is not bothered by the smooth bias field.
 
-Rigid transform (same subject and session, only the head moved) with Mattes mutual information (the
-contrasts differ). The FLAIR is never resampled: it is the evaluation grid.
+The transform is rigid because both images come from the same session and only the head moved, and the metric
+is Mattes mutual information because the two contrasts differ. The FLAIR is never resampled since it is the
+evaluation grid.
 
-QC against the organizers' elastix registration: correlation of our registered T1 with ``orig/T1``,
-and displacement (mean, max, mm) and relative rotation between the two transforms over the head.
-Subjects listed in ``preproc.rigid.use_elastix`` (sub-146) take the elastix transform instead; the
-ANTs one is kept as ``..._desc-ants_xfm.mat``.
+The result is checked against the organizers' elastix registration, by the correlation of our registered T1
+with theirs and by the displacement and relative rotation between the two transforms over the head. Subjects
+listed in preproc.rigid.use_elastix (sub-146) take the elastix transform instead, and the ANTs one is kept
+with the desc-ants suffix.
 
-Output: ``sub-XXX_from-T1w_to-FLAIR_mode-image_xfm.mat`` (ITK format) in
-``data/derivatives/wmh-multisite/sub-XXX/anat/``.
+Output: sub-XXX_from-T1w_to-FLAIR_mode-image_xfm.mat (ITK format) in
+data/derivatives/wmh-multisite/sub-XXX/anat/.
 
 Usage:
     uv run python -m wmh_multisite.preproc.register --split training --jobs 4
@@ -46,10 +47,10 @@ log = logging.getLogger(__name__)
 
 
 def remove_registration_files(reg: dict[str, Any]) -> int:
-    """Delete the transform files ANTsPy leaves in the system temp folder (once copied).
+    """Delete the transform files that ANTsPy leaves in the system temp folder, once they have been copied.
 
-    ANTsPy never cleans them up; 5.4 GB had piled up and filled the disk. Only files sitting directly
-    in the temp folder are removed.
+    ANTsPy never cleans them up, and they had filled the disk (5.4 GB). Only files sitting directly in the
+    temp folder are removed.
     """
     import tempfile
 
@@ -77,9 +78,9 @@ def subject_paths(cfg: dict[str, Any], sub: str) -> dict[str, Path]:
 
 
 def resample_onto_flair(flair: Path, moving: Path, xfm: Path, out: Path, labels: bool = False) -> Path:
-    """Resample a T1-grid image onto the FLAIR grid: linear for images, ``genericLabel`` for masks.
+    """Resample a T1-grid image onto the FLAIR grid, linearly for images and with genericLabel for masks.
 
-    ANTs and nibabel arrays share the file's voxel order, so ``io.save_like`` can reuse the FLAIR header.
+    ANTs and nibabel arrays share the voxel order of the file, so io.save_like can reuse the FLAIR header.
     """
     fixed = ants.image_read(str(flair))
     result = ants.apply_transforms(
@@ -98,8 +99,7 @@ def resample_onto_flair(flair: Path, moving: Path, xfm: Path, out: Path, labels:
 def elastix_euler(param_file: Path) -> sitk.Euler3DTransform:
     """Rebuild the organizers' rigid transform from its elastix parameter file.
 
-    Like an ANTs forward transform, it maps a point of the FLAIR (fixed) space to the T1 (moving)
-    space, in LPS millimeters.
+    Like an ANTs forward transform, it maps a point of the FLAIR space to the T1 space, in LPS millimetres.
     """
     text = param_file.read_text()
 
@@ -120,11 +120,11 @@ def elastix_euler(param_file: Path) -> sitk.Euler3DTransform:
 def compare_transforms(
     ours: sitk.Transform, reference: sitk.Transform, points: np.ndarray
 ) -> dict[str, float]:
-    """Displacement between two transforms over physical points (LPS mm), and their relative rotation.
+    """Displacement between two transforms over a set of points (LPS mm), and their relative rotation.
 
-    Comparing parameters directly would be misleading: a rotation and a translation only mean
-    something with respect to a center, and the two tools do not use the same center. Mapping the
-    same points with both transforms gives a center-independent answer, in millimeters.
+    Comparing the parameters directly would be misleading, because a rotation and a translation only mean
+    something with respect to a centre and the two tools do not use the same one. Mapping the same points with
+    both transforms gives an answer in millimetres that does not depend on the centre.
     """
     diff = np.array(
         [np.subtract(ours.TransformPoint(tuple(p)), reference.TransformPoint(tuple(p))) for p in points]
@@ -140,7 +140,7 @@ def compare_transforms(
 
 
 def head_points(image: ants.ANTsImage, mask: np.ndarray, n: int = 5000, seed: int = 0) -> np.ndarray:
-    """Physical (LPS) coordinates of ``n`` random voxels of ``mask`` in ``image`` (ANTs voxel order)."""
+    """Physical (LPS) coordinates of n random voxels of mask in image."""
     idx = np.argwhere(mask)
     idx = idx[np.random.default_rng(seed).choice(len(idx), size=min(n, len(idx)), replace=False)]
     direction = np.asarray(image.direction)
@@ -148,9 +148,10 @@ def head_points(image: ants.ANTsImage, mask: np.ndarray, n: int = 5000, seed: in
 
 
 def register_subject(sub: str, config_path: str | None = None) -> dict[str, Any]:
-    """Register one subject (raw T1 -> raw FLAIR); skip it if the transform exists. Returns one QC row.
+    """Register one subject (raw T1 to raw FLAIR) and return its QC row. Skipped if the transform exists.
 
-    Kept at module level with plain arguments so that it can run in a guarded child process.
+    The function lives at module level and takes plain arguments so that it can run in a guarded child
+    process.
     """
     cfg = load_config(config_path)
     rigid = cfg["preproc"]["rigid"]
@@ -218,7 +219,7 @@ def run(
     subjects: list[str] | None = None,
     config_path: str | None = None,
 ) -> Path:
-    """Register every selected subject, at most ``jobs`` at a time, each in a guarded process."""
+    """Register every selected subject, at most jobs at a time, each in a guarded process."""
     participants = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t")
     selected = participants[participants.split.isin(splits)].participant_id.tolist()
     if subjects:

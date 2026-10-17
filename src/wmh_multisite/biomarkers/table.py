@@ -1,21 +1,16 @@
-"""Biomarker table: volumes, location and lesion structure per subject and source.
+"""Biomarker table: volumes, location and lesion counts for every subject and source.
 
-    test (110)        : O1 (manual reference) + every model with predictions (M1 nnU-Net, M3 threshold,
-                        then M2 WMH-SynthSeg and DA5)
-    training (60)     : O1, O3, O4 (three experts: the human spread of the biomarkers)
-                        + M1 on the 12 fold-0 validation subjects (held out from that model)
-        |
-        |  label 2 of O1 removed from every mask; HD-BET brain mask for the fraction;
-        |  ventricles = first available of ``biomarkers.ventricles`` (WMH-SynthSeg),
-        |  recorded in ``ventricle_source`` (NaN if the subject has none yet)
-        v
-    results/tables/biomarkers.csv   one row per (subject, source)
+On the test set the sources are O1 and every model with predictions. On the training set they are the three
+experts O1, O3 and O4, plus M1 on its 12 fold-0 validation subjects. Other training-set predictions of M1, and
+those of M3 (tuned on the training set), are left out because they would be optimistic.
 
-Training-set predictions of M1 (other than the 12 held-out subjects) and of M3 (tuned on the training
-set) are not used: they would be optimistic.
+Label 2 of O1 is removed from every mask, the brain fraction uses the HD-BET mask, and the ventricles are the
+first available mask listed in biomarkers.ventricles.
 
-Check: on the test set, the WMH volumes must equal ``true_ml`` / ``pred_ml`` of the official evaluation
-tables; the largest difference is logged.
+As a check, the test-set WMH volumes must match true_ml and pred_ml in the official evaluation tables. The
+largest difference is logged.
+
+Output: results/tables/biomarkers.csv, one row per subject and source.
 
 Usage:
     uv run python -m wmh_multisite.biomarkers.table
@@ -64,7 +59,7 @@ def brain_mask(cfg: dict[str, Any], sub: str) -> Path:
 
 
 def sources_for(cfg: dict[str, Any], sub: str, split: str, held_out: dict[str, Path]) -> dict[str, Path]:
-    """Segmentations to measure for one subject (missing files are skipped by the caller)."""
+    """Segmentations to measure for one subject. Missing files are skipped by the caller."""
     out = {"O1": manual(cfg, sub, "O1")}
     if split == "test":
         out |= {m: prediction(cfg, sub, m) for m in cfg["biomarkers"]["models"]}
@@ -76,7 +71,7 @@ def sources_for(cfg: dict[str, Any], sub: str, split: str, held_out: dict[str, P
 
 
 def ventricles_for(cfg: dict[str, Any], sub: str) -> tuple[str, Path] | tuple[None, None]:
-    """First available ventricle mask of the subject, in the order of ``biomarkers.ventricles``."""
+    """First available ventricle mask of the subject, in the order given by biomarkers.ventricles."""
     d = resolve_path(cfg, "derivatives") / PIPELINE / sub / "anat"
     for desc in cfg["biomarkers"]["ventricles"]:
         path = d / f"{sub}_space-FLAIR_desc-{desc}_mask.nii.gz"
@@ -175,7 +170,7 @@ def build(cfg: dict[str, Any], jobs: int) -> pd.DataFrame:
 
 
 def check_against_evaluation(cfg: dict[str, Any], table: pd.DataFrame) -> dict[str, float]:
-    """Largest |volume - official volume| (ml) per source on the test set (should be ~0)."""
+    """Largest difference (ml) between our test-set volumes and the official ones, per source."""
     out = {}
     for f in sorted((resolve_path(cfg, "results") / "tables").glob("evaluation_*.csv")):
         if f.stem.endswith("_summary"):

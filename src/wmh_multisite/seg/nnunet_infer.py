@@ -1,19 +1,17 @@
 """nnU-Net inference on the local GPU.
 
-The trained model (``data/nnunet/nnUNet_results/...``, downloaded from Kaggle) is applied to the
-preprocessed images of each subject: FLAIR N4 (channel 0) and T1 N4 on the FLAIR grid (channel 1),
-read directly from the derivatives. Predictions are written on the FLAIR grid, as BIDS derivatives:
+The trained model, downloaded from Kaggle into data/nnunet/nnUNet_results/, is applied to the preprocessed
+images of each subject (N4 FLAIR and N4 T1 on the FLAIR grid), read directly from the derivatives. Predictions
+are written on the FLAIR grid as sub-XXX_space-FLAIR_desc-<model>_dseg.nii.gz (0/1).
 
-    data/derivatives/wmh-multisite/sub-XXX/anat/sub-XXX_space-FLAIR_desc-<model>_dseg.nii.gz   (0 / 1)
-
-Each batch runs ``nnunet_infer_worker.py`` in the temporary CUDA environment (the project's PyTorch is
-CPU-only), under the memory watchdog, with a hard cap on GPU memory, like HD-BET. Subjects
-already predicted are skipped; every prediction is checked (FLAIR grid, labels 0/1) before it is kept.
+As for HD-BET, each batch runs nnunet_infer_worker.py in a temporary CUDA environment (the project's PyTorch
+is CPU-only), under the memory watchdog and with a cap on GPU memory. Subjects that already have a prediction
+are skipped, and every prediction is checked before it is kept.
 
 Usage:
     uv run python -m wmh_multisite.seg.nnunet_infer --split test
     uv run python -m wmh_multisite.seg.nnunet_infer --subjects sub-100 --model resencm
-    uv run python -m wmh_multisite.seg.nnunet_infer --split test --inputs challenge   # desc-resencmpre
+    uv run python -m wmh_multisite.seg.nnunet_infer --split test --inputs challenge   # organizers' images
 """
 
 from __future__ import annotations
@@ -84,9 +82,10 @@ def check_prediction(pred: Path, flair: Path) -> None:
 def predict_cases(
     cfg: dict[str, Any], model: str, cases: list[dict[str, Path]], staging_name: str
 ) -> pd.DataFrame:
-    """Predict arbitrary cases: each ``{"id", "flair", "t1", "out"}`` (FLAIR grid). Used by ``run`` (our
-    preprocessing), the preprocessing experiment (``--inputs challenge``) and the robustness study
-    (``qc.robustness``). Cases whose output exists are skipped; each prediction is checked before it is kept.
+    """Predict a list of cases, each given as {"id", "flair", "t1", "out"} on the FLAIR grid.
+
+    Used for our preprocessing, for the organizers' images and for the robustness study. Cases whose output
+    already exists are skipped, and each prediction is checked before it is kept.
     """
     inf = cfg["segmentation"]["nnunet"]["inference"]
     mdir = model_dir(cfg, model)
@@ -147,14 +146,17 @@ def predict_cases(
 
 
 def challenge_inputs(cfg: dict[str, Any], sub: str) -> tuple[Path, Path]:
-    """The organizers' preprocessing (``pre/``: SPM12 bias correction, T1 registered with elastix)."""
+    """The organizers' preprocessed images (SPM12 bias correction, T1 registered with elastix)."""
     c = resolve_path(cfg, "bids") / "derivatives" / "challenge" / sub / "anat"
     return c / f"{sub}_desc-spm12_FLAIR.nii.gz", c / f"{sub}_space-FLAIR_desc-spm12_T1w.nii.gz"
 
 
 def run(cfg: dict[str, Any], subjects: list[str], model: str, inputs: str = "ours") -> pd.DataFrame:
-    """``inputs="ours"``: our preprocessing, predictions ``desc-<model>``; ``inputs="challenge"``:
-    the organizers' ``pre/`` images (preprocessing experiment), predictions ``desc-<model>pre``."""
+    """Predict the selected subjects.
+
+    With inputs="ours" the model runs on our preprocessing and writes desc-<model>. With inputs="challenge" it
+    runs on the organizers' images and writes desc-<model>pre.
+    """
     cases = []
     for s in subjects:
         p = paths(cfg, s, model)

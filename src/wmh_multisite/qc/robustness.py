@@ -1,23 +1,20 @@
 """Robustness of nnU-Net (M1) to image artifacts.
 
-``qc.artifacts`` asks whether the QC detects a degraded image; what matters is the artifact level at
-which the segmentation itself degrades. An artifact the QC misses is harmless if the segmentation
-survives it, and a real risk if the segmentation breaks first.
+qc.artifacts asks whether the QC detects a degraded image. What really matters is the level at which the
+segmentation itself starts to degrade: an artifact the QC misses is harmless if the segmentation survives it,
+and a real risk if the segmentation breaks first.
 
-    10 test subjects of class "usable" (``qc.artifacts.n_per_scanner`` per scanner; test subjects so
-    that the model has never seen them; the same subjects as ``qc.artifacts``)
-      x artifact (noise, motion, bias, ghosting) x level 1..4 (``qc.artifacts.levels``; level 0 = the
-        existing prediction on the unmodified image)
-      -> the model input (FLAIR N4) degraded with TorchIO (``qc.artifacts.degrade``, fixed seed); the
-         T1 channel is left intact (only the FLAIR is degraded)
-      -> nnU-Net (same model and inference settings as on the test set)
-      -> official metrics against O1
-      v
-    results/tables/robustness_nnunet.csv, results/figures/robustness_nnunet.png
+We use the same usable test subjects as qc.artifacts (qc.artifacts.n_per_scanner per scanner, never seen by
+the model). Their N4 FLAIR, the model input, is degraded with each artifact at levels 1 to 4 with a fixed
+seed, while the T1 channel is left untouched. Level 0 is the existing prediction on the unmodified image.
+nnU-Net then segments the degraded images with the same model and settings as on the test set, and the result
+is scored against O1 with the official metrics. Since the bias artifact is added to the N4 image, it stands
+for a residual bias that N4 did not remove.
 
-Degraded images and predictions are written to ``data/derivatives/wmh-multisite/_robustness/`` (not
-pipeline outputs). The bias artifact applied to the N4 image stands for a residual bias that N4 did not
-remove.
+The degraded images and their predictions are written to data/derivatives/wmh-multisite/_robustness/ and are
+not pipeline outputs.
+
+Outputs: results/tables/robustness_nnunet.csv and results/figures/robustness_nnunet.png.
 
 Usage:
     uv run python -m wmh_multisite.qc.robustness
@@ -49,7 +46,7 @@ MODEL = "resencm"
 
 
 def build_cases(cfg: dict[str, Any], subjects: list[str]) -> tuple[list[dict[str, Any]], pd.DataFrame]:
-    """Write the degraded FLAIRs; return the nnU-Net cases and the case table."""
+    """Write the degraded FLAIRs and return the nnU-Net cases and the case table."""
     work = resolve_path(cfg, "derivatives") / PIPELINE / "_robustness"
     levels = cfg["qc"]["artifacts"]["levels"]
     seed = cfg["evaluation"]["seed"]

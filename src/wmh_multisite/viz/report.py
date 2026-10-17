@@ -1,10 +1,10 @@
-"""QC report: table of the IQM classes + thumbnails of the flagged images.
+"""HTML QC report for the visual check of the flagged images.
 
-One self-contained HTML file for the visual review: for every subject classed "check" or "exclude",
-the central axial, coronal and sagittal slices of the raw FLAIR and T1, with its worst metrics.
+For every subject classed check or exclude, the report shows the central axial, coronal and sagittal slices of
+the raw FLAIR and T1, with the metrics that flagged it. It is a single self-contained HTML file.
 
-Never published: the thumbnails are patient images (CC BY-NC 4.0). The report goes to ``results/qc/``,
-which git ignores; only aggregated numbers reach the README.
+It is never published, since the thumbnails are patient images (CC BY-NC 4.0 data). It goes to results/qc/,
+which git ignores.
 
 Usage:
     uv run python -m wmh_multisite.viz.report

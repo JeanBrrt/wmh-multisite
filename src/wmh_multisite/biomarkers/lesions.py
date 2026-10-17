@@ -1,13 +1,13 @@
-"""Lesion structure: number and size distribution of the WMH.
+"""Lesion count and size distribution.
 
 A lesion is a 26-connected component of the WMH mask, as in the official challenge script.
 
-Two pitfalls shape the indicators:
-- The smallest possible lesion is one voxel, and voxels range from 1.75 to 4.72 mm3 across scanners, so
-  raw counts are not comparable between sites. ``n_lesions_ge_min`` only counts lesions of at least
-  ``min_lesion_mm3`` (10 mm3: about 2 voxels on the coarsest grid, 6 on the finest).
-- As the load grows, lesions merge into one periventricular plaque and the count can drop.
-  ``largest_share`` (share of the volume in the largest lesion) tracks this.
+Voxel sizes go from 1.75 to 4.72 mm3 depending on the scanner, so the smallest possible lesion is not the same
+everywhere and raw counts are not comparable between sites. We therefore only count lesions of at least
+min_lesion_mm3 (10 mm3, about 2 voxels on the coarsest grid).
+
+As the lesion load grows, lesions merge into a single periventricular plaque and the count can go down.
+largest_share, the share of the volume held by the largest lesion, keeps track of this.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ STRUCTURE = np.ones((3, 3, 3), bool)  # 26-connectivity, as the official script
 
 
 def lesion_sizes_mm3(wmh: np.ndarray, voxel_mm3: float) -> np.ndarray:
-    """Volume (mm3) of each connected component of the WMH mask."""
+    """Volume in mm3 of each connected component of the WMH mask."""
     lab, n = ndimage.label(wmh.astype(bool), structure=STRUCTURE)
     return np.bincount(lab.ravel(), minlength=n + 1)[1:] * voxel_mm3
 

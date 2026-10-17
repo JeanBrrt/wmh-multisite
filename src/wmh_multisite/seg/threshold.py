@@ -1,42 +1,27 @@
-r"""FLAIR thresholding, method M3: the classical baseline.
+"""FLAIR thresholding, method M3, the classical baseline.
 
-WMH are bright on FLAIR by definition, so the simplest segmentation keeps the voxels above a
-threshold. It shows what the learnt methods (M1 nnU-Net, M2 WMH-SynthSeg) add, and how much a fixed
-intensity rule depends on the scanner.
+WMH are bright on FLAIR by definition, so the simplest segmentation keeps the voxels above a threshold. It
+shows what the learnt methods (M1 and M2) bring, and how much a fixed intensity rule depends on the scanner.
+Starting from the N4 FLAIR and the HD-BET brain mask:
 
-    FLAIR N4 (FLAIR grid) + HD-BET brain mask (FLAIR grid)
-       |
-       |  1. z-score inside the brain (median, MAD)
-       v
-    z map ----- 2. z > t ----------------------------\
-       |                                               \
-       |  depth: distance (mm) to the brain border       >-- candidates
-       \--------- 3. depth > e -------------------------/
-                                                         |
-                                 4. connected components smaller than m mm3 removed
-                                                         v
-                                        sub-XXX_space-FLAIR_desc-threshold_dseg.nii.gz
+1. the FLAIR becomes a robust z-score over the brain voxels, (FLAIR - median) / (1.4826 MAD). The median and
+   MAD barely move with the bright lesions, unlike the mean and SD;
+2. voxels with z above t are kept;
+3. voxels closer than e mm to the brain border are removed, because the border is full of bright voxels that
+   are not lesions (cortex, vessels, partial volume) while WMH lie deeper;
+4. connected components smaller than m mm3 are removed. The size is in mm3 so that it means the same on 2D and
+   3D FLAIRs.
 
-1. z = (FLAIR - median) / (1.4826 x MAD) over the brain voxels only. Unlike mean and SD, median and
-   MAD barely move with the bright lesions, and the scale is the same on every scanner.
-2. Threshold t on z.
-3. Minimum depth e (mm to the brain border): the border is full of bright non-lesion voxels (cortex,
-   leftover meninges or vessels, partial volume), while WMH sit deeper (5th percentile: 16 mm).
-4. Minimum size m, in mm3 so that it means the same on 3 mm 2D and 3D FLAIRs (26-connectivity).
+A single (t, e, m) for all scanners is chosen by grid search on the 60 training subjects, maximising the mean
+Dice with label 2 ignored. The best threshold of each scanner is reported to show how scanner-dependent the
+rule is, but never used.
 
-One global (t, e, m) is chosen by grid search on the 60 training subjects, maximising the mean Dice
-(label 2 ignored, as in the official evaluation). The best threshold per scanner is reported to show
-how scanner-dependent the rule is, but never used.
-
-Outputs:
-    results/tables/threshold_tuning.csv        mean Dice of every (t, e, m), overall and per scanner
-    results/tables/threshold_params.json       chosen (t, e, m) and their training Dice
-    data/derivatives/wmh-multisite/sub-XXX/anat/sub-XXX_space-FLAIR_desc-threshold_dseg.nii.gz
+Outputs: results/tables/threshold_tuning.csv (mean Dice of every combination), threshold_params.json (the
+chosen values) and sub-XXX_space-FLAIR_desc-threshold_dseg.nii.gz in the derivatives.
 
 Usage:
     uv run python -m wmh_multisite.seg.threshold --tune                 # grid search on the training set
     uv run python -m wmh_multisite.seg.threshold --apply --split all    # writes the 170 segmentations
-    uv run python -m wmh_multisite.evaluate.metrics --model threshold --split test
 """
 
 from __future__ import annotations
@@ -64,7 +49,7 @@ MODEL = "threshold"
 
 
 def model_name(normalization: str) -> str:
-    """BIDS desc of the predictions: ``threshold`` for the robust z, ``threshold<method>`` otherwise."""
+    """Name of the predictions: threshold for the z-score, threshold<method> for the other normalisations."""
     return MODEL if normalization == "zscore" else f"{MODEL}{normalization}"
 
 
@@ -76,7 +61,7 @@ STRUCTURE = np.ones((3, 3, 3), bool)  # 26-connectivity
 
 
 def zscore_in_brain(flair: np.ndarray, brain: np.ndarray) -> np.ndarray:
-    """Robust z-score with statistics taken inside the brain only."""
+    """Robust z-score with the statistics taken inside the brain only."""
     values = flair[brain]
     median = float(np.median(values))
     mad = float(np.median(np.abs(values - median))) * 1.4826  # = standard deviation for a Gaussian
@@ -86,12 +71,12 @@ def zscore_in_brain(flair: np.ndarray, brain: np.ndarray) -> np.ndarray:
 
 
 def depth_mm(brain: np.ndarray, spacing: tuple[float, ...]) -> np.ndarray:
-    """Distance (mm) from each brain voxel to the nearest voxel outside the brain; 0 outside."""
+    """Distance in mm from each brain voxel to the nearest voxel outside the brain (0 outside)."""
     return ndimage.distance_transform_edt(brain, sampling=spacing).astype(np.float32)
 
 
 def remove_small(mask: np.ndarray, min_size_mm3: float, voxel_mm3: float) -> np.ndarray:
-    """Remove the connected components (26-connectivity) smaller than ``min_size_mm3``."""
+    """Remove the connected components (26-connectivity) smaller than min_size_mm3."""
     if min_size_mm3 <= 0 or not mask.any():
         return mask
     lab, _ = ndimage.label(mask, structure=STRUCTURE)
@@ -109,7 +94,7 @@ def segment(
     min_depth_mm: float,
     min_size_mm3: float,
 ) -> np.ndarray:
-    """Steps 2 to 4: bright, deep enough, and part of a large enough component."""
+    """Keep the voxels that are bright enough, deep enough and in a large enough component."""
     candidates = (z > threshold) & (depth > min_depth_mm)
     return remove_small(candidates, min_size_mm3, voxel_mm3)
 
@@ -132,9 +117,9 @@ def subject_paths(cfg: dict[str, Any], sub: str, normalization: str = "zscore") 
 def prepare(
     p: dict[str, Path], normalization: str = "zscore", norm_params: dict[str, Any] | None = None
 ) -> tuple[np.ndarray, np.ndarray, float, tuple[slice, ...]]:
-    """Normalised FLAIR and depth map cropped to the brain bounding box (faster grid search), voxel volume.
+    """Normalised FLAIR, depth map and voxel volume, cropped to the brain to speed up the grid search.
 
-    ``normalization``: ``zscore`` or another method of ``harmonize.intensity``.
+    normalization is zscore or any other method of harmonize.intensity.
     """
     brain = io.load_labels(p["brain"], allowed=(0, 1)).astype(bool)
     flair = io.load_data(p["flair_n4"])
@@ -155,10 +140,10 @@ def grid_counts(
     normalization: str = "zscore",
     norm_params: dict[str, Any] | None = None,
 ) -> np.ndarray:
-    """For one training subject: true positives, predicted and true volumes (voxels) for every
-    (t, e, m) of the grid, label 2 excluded from the counts. Shape (n_t, n_e, n_m, 3).
+    """True positives, predicted volume and true volume (in voxels) of one subject for every (t, e, m).
 
-    One labelling per (t, e): every minimum size m is then read from the component sizes.
+    Label 2 is left out of the counts. The mask is labelled once per (t, e) and every minimum size m is then
+    read from the component sizes. Returns an array of shape (n_t, n_e, n_m, 3).
     """
     cfg = load_config(config_path)
     p = subject_paths(cfg, sub)
@@ -206,7 +191,7 @@ def fit_normalization(cfg: dict[str, Any], subjects: list[str], normalization: s
 def tune(
     cfg: dict[str, Any], jobs: int, config_path: str | None = None, normalization: str = "zscore"
 ) -> dict[str, Any]:
-    """Grid search on the training subjects; writes the tuning table and the chosen params."""
+    """Grid search on the training subjects. Writes the tuning table and the chosen parameters."""
     part = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t")
     train = part[part.split == "training"]
     grid = _grid(cfg, normalization)

@@ -1,28 +1,19 @@
-"""Inter-observer agreement on the training set: the human ceiling.
+"""Agreement between experts on the training set, used as the human ceiling.
 
-O1 is itself one expert's drawing, and two experts never draw the same lesions, so no method can reach
-Dice = 1 against it. Scoring two other experts (O3, O4, who delineated the 60 training scans on their
-own) against O1 with the same official metrics gives the level a human reaches.
+O1 is itself one expert's delineation and two experts never draw exactly the same lesions, so no method can
+reach a Dice of 1 against it. We score the two other experts, O3 and O4, who delineated the 60 training scans
+independently, against O1 with the official metrics, and also against each other.
 
-    60 training scans                                       (official metrics, label 2 of O1 ignored)
-      O1 (reference) <---- O3                               "how far is one human from the reference?"
-      O1 (reference) <---- O4
-      O3 <---- O4  (O1's label 2 also ignored)              "how far are two humans from each other?"
-    12 of them never seen by nnU-Net (fold-0 validation cases)
-      O1 (reference) <---- M1 (nnU-Net)                     paired with O3 and O4 on the same 12 scans
+Dice, HD95 and lesion F1 are symmetric, so the O3 versus O4 comparison makes sense for them. AVD and lesion
+recall depend on which observer is taken as the reference and are only given for completeness.
 
-Dice, HD95 and lesion F1 are symmetric, so O3 vs O4 is well defined for them. AVD and lesion recall
-depend on which observer is the reference (here O3) and are reported for completeness only.
+M1 is added on its 12 fold-0 validation subjects, using nnU-Net's own validation predictions. These subjects
+were held out from the model used on the test set, so they are the only scans where M1 and the experts can be
+compared on the same images. On them, M1 is tested against each expert with a paired Wilcoxon test on the
+symmetric metrics and a Holm correction over the 6 tests.
 
-The M1 rows use nnU-Net's fold-0 validation predictions (``fold_0/validation``). Those 12 subjects were
-held out from the very model used on the test set (final checkpoint, not selected on them), so they are
-the only scans where M1 and the humans can be compared on the same images. On them, M1 is tested
-against each expert (paired Wilcoxon on the symmetric metrics, Holm over these 6 tests).
-
-Outputs:
-    results/tables/interobserver.csv           one row per (subject, rater, reference)
-    results/tables/interobserver_summary.csv   means overall, by scanner, and on the 12 shared scans
-    results/tables/interobserver_paired.csv    M1 vs O3 and vs O4 on the 12 shared scans
+Outputs: results/tables/interobserver.csv (one row per subject, rater and reference),
+interobserver_summary.csv and interobserver_paired.csv.
 
 Usage:
     uv run python -m wmh_multisite.evaluate.interobserver
@@ -64,15 +55,17 @@ def manual(cfg: dict[str, Any], sub: str, observer: str) -> Path:
 
 
 def with_ignore(observer: Path, reference: Path, out: Path) -> Path:
-    """Copy of ``observer`` (0/1) where the "other pathology" voxels of ``reference`` (label 2) are set
-    to 2, so that they are ignored when ``observer`` serves as the reference."""
+    """Copy of observer in which the other-pathology voxels of the reference are set to 2.
+
+    This way those voxels are ignored when the observer itself is used as the reference.
+    """
     obs = io.load_labels(observer, allowed=(0, 1))
     ref = io.load_labels(reference)
     return io.save_like(np.where(ref == 2, 2, obs).astype(np.float32), observer, out)
 
 
 def compare(args: tuple[str, str, str, str, str]) -> dict[str, Any]:
-    """One comparison: ``rater`` scored against ``reference`` (official metrics)."""
+    """Official metrics of one rater against one reference."""
     sub, rater, reference, rater_path, reference_path = args
     return {
         "participant_id": sub,
@@ -83,7 +76,7 @@ def compare(args: tuple[str, str, str, str, str]) -> dict[str, Any]:
 
 
 def validation_cases(cfg: dict[str, Any], model: str = "resencm") -> dict[str, Path]:
-    """participant_id -> fold-0 validation prediction of nnU-Net (subjects held out from that model)."""
+    """Fold-0 validation predictions of nnU-Net, by participant id."""
     nn = cfg["segmentation"]["nnunet"]
     folder = model_dir(cfg, model) / f"fold_{nn['fold']}" / "validation"
     mapping = pd.read_csv(
@@ -124,7 +117,7 @@ def run(cfg: dict[str, Any], jobs: int) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def summarize(table: pd.DataFrame) -> pd.DataFrame:
-    """Mean of each metric per (rater vs reference), overall, by scanner, and on the scans shared with M1."""
+    """Mean of each metric per comparison, overall, by scanner and on the scans shared with M1."""
     pairs = table.rater + " vs " + table.reference
     groups: dict[str, pd.DataFrame] = {}
     for pair, g in table.groupby(pairs):
@@ -142,12 +135,12 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
 def paired_with_m1(
     table: pd.DataFrame, n_boot: int = 2000, level: float = 0.95, seed: int = 42
 ) -> pd.DataFrame:
-    """M1 against each expert on the scans they share, against O1, per symmetric metric.
+    """M1 against each expert on the scans they share, with O1 as the reference.
 
-    Per-subject differences M1 - expert, with a bootstrap CI of their mean (resampled within each
-    scanner, as for the test-set comparisons), Wilcoxon signed-rank test, Holm over the 6 tests (2
-    experts x 3 metrics: one family, one question). ``n_m1_better`` counts the subjects where M1 is
-    closer to O1 (higher Dice or F1, lower HD95)."""
+    For each symmetric metric we take the per-subject difference M1 - expert, its mean with a bootstrap CI
+    (resampled within each scanner) and a Wilcoxon signed-rank test, then apply Holm over the 6 tests.
+    n_m1_better counts the subjects where M1 is closer to O1.
+    """
     rng = np.random.default_rng(seed)
     shared = table[table.shared_with_m1 & (table.reference == "O1")]
     wide = shared.pivot_table(index=["participant_id", "scanner"], columns="rater", values=SYMMETRIC)

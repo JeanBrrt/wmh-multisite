@@ -1,19 +1,17 @@
-"""nnU-Net inference worker, run on the local GPU in a temporary uv environment (CUDA PyTorch + nnU-Net).
+"""nnU-Net inference worker, run on the local GPU in a temporary uv environment (CUDA PyTorch and nnU-Net).
 
-Executed by path (not imported): it only imports the standard library, torch and nnunetv2, never
-``wmh_multisite``. Launched by ``seg/nnunet_infer.py`` under the memory watchdog.
+It is executed by path and never imported, so it only uses the standard library, torch and nnunetv2, never
+wmh_multisite. seg/nnunet_infer.py launches it under the memory watchdog.
 
-The model was trained with a custom trainer (``nnUNetTrainerWMH_250``, defined on Kaggle only: same
-network as ``nnUNetTrainer``, only the number of epochs and the checkpoint period differ). It is not
-installed locally, so the network is rebuilt from ``plans.json`` with the standard trainer's
-``build_network_architecture`` and the weights of ``checkpoint_final.pth`` are loaded into it
-(``nnUNetPredictor.manual_initialization``) instead of ``initialize_from_trained_model_folder``.
+The model was trained with our own trainer (nnUNetTrainerWMH_250), which only changes the number of epochs and
+the checkpoint period. That trainer is not installed locally, so the network is rebuilt from plans.json with
+the standard trainer's build_network_architecture and the weights of checkpoint_final.pth are loaded into it.
 
 Usage (normally not called by hand):
     python nnunet_infer_worker.py job.json
-with job.json = {"model_dir": ..., "fold": 0, "checkpoint": "checkpoint_final.pth",
-                 "cases": [[flair, t1, output_without_ending], ...], "vram_cap_gb": 5.5,
-                 "use_mirroring": true, "tile_step_size": 0.5}
+where job.json is {"model_dir": ..., "fold": 0, "checkpoint": "checkpoint_final.pth",
+                   "cases": [[flair, t1, output_without_ending], ...], "vram_cap_gb": 5.5,
+                   "use_mirroring": true, "tile_step_size": 0.5}
 """
 
 import json

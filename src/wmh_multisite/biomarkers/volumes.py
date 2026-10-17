@@ -1,14 +1,15 @@
-"""WMH load: volume and fraction of the brain.
+"""WMH volume and its fraction of the brain and of the intracranial volume.
 
-- WMH volume (ml) = WMH voxels x voxel volume. Voxels go from 1.75 mm3 (Amsterdam Philips) to 4.72 mm3
-  (Amsterdam GE 1.5T), so voxel counts are never compared as such.
-- Fraction of the brain (%) = WMH volume / HD-BET brain volume. Never the head mask, whose extent
-  depends on defacing and on the site. The brain shrinks with atrophy, which inflates this fraction.
-- Fraction of the intracranial volume (%), which does not shrink with atrophy (CSF fills the space).
-  ICV = every labelled voxel of the 1 mm WMH-SynthSeg segmentation.
+Volumes are computed with the voxel size of each image (from 1.75 to 4.72 mm3 depending on the scanner), so
+voxel counts are never compared directly.
 
-Label 2 of O1 ("other pathology") is removed from every segmentation first, as in the official
-evaluation.
+The brain fraction uses the HD-BET brain mask rather than a head mask, whose extent depends on the defacing
+and the site. The brain shrinks with atrophy, which inflates this fraction, so we also give the fraction of
+the intracranial volume (ICV), which does not shrink since CSF fills the space. The ICV is the set of labelled
+voxels of the 1 mm WMH-SynthSeg segmentation.
+
+As in the official evaluation, the voxels labelled 2 (other pathology) in O1 are removed from every
+segmentation first.
 """
 
 from __future__ import annotations
@@ -33,5 +34,5 @@ def volume_biomarkers(wmh: np.ndarray, brain: np.ndarray, voxel_mm3: float) -> d
 
 
 def icv_ml(labels: np.ndarray, voxel_mm3: float) -> float:
-    """Intracranial volume (ml): every non-zero voxel of a whole-head anatomical segmentation."""
+    """Intracranial volume in ml: all non-zero voxels of a whole-head segmentation."""
     return float(np.count_nonzero(labels)) * voxel_mm3 / 1000

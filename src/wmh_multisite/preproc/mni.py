@@ -1,21 +1,22 @@
-"""Registration to the 2 mm MNI template, for the lesion frequency maps (``biomarkers.mni``).
+"""Registration of each subject to the 2 mm MNI template, used for the lesion frequency maps.
 
-    subject T1 N4, brain only  ---- SyN, cross-correlation ---->  MNI152NLin2009cAsym 2 mm T1, brain only
+The N4-corrected T1, restricted to the brain, is registered with SyN to the brain of the MNI152NLin2009cAsym
+template at 2 mm. Working brain to brain avoids the skull, scalp and neck, which vary between people and are
+not in the template.
 
-Brain to brain: skull, scalp and neck vary between people and are not in the template.
-Cross-correlation follows the dilated ventricles of atrophic subjects, which the default Mattes mutual
-information left inside the template contour; it costs much more, and the 2 mm template brings it back
-to ~6 min per subject (8x fewer voxels) for a nearly identical result. The settings comparison on a few
-subjects is kept in ``results/tables/mni_syn_settings.csv``.
+We use cross-correlation rather than the default Mattes mutual information because it follows the enlarged
+ventricles of atrophic subjects, which the default setting left inside the template contour. It is slower, but
+the 2 mm template (8 times fewer voxels) brings it back to about 6 minutes per subject for a nearly identical
+result. The comparison of settings on a few subjects is kept in results/tables/mni_syn_settings.csv.
 
-Several ITK threads per subject make the result very slightly non-deterministic (last digits of the
-deformation); the maps are averaged over tens of subjects, so this does not show in the results.
+With several ITK threads per subject the result is not reproducible to the last digit of the deformation. The
+maps are averaged over tens of subjects, so this does not show in the results.
 
-Outputs, in ``data/derivatives/wmh-multisite/sub-XXX/anat/``:
+Outputs, in data/derivatives/wmh-multisite/sub-XXX/anat/:
     sub-XXX_from-T1w_to-MNI152NLin2009cAsym_res-2_mode-image_desc-affine_xfm.mat
     sub-XXX_from-T1w_to-MNI152NLin2009cAsym_res-2_mode-image_desc-warp_xfm.nii.gz
-and ``results/tables/mni_registration_qc.csv`` (time, memory, brain correlation with the template).
-A subject whose two transforms exist is skipped.
+and results/tables/mni_registration_qc.csv (time, memory and brain correlation with the template). Subjects
+that already have both transforms are skipped.
 
 Usage:
     uv run python -m wmh_multisite.preproc.mni --subjects sub-000
@@ -45,7 +46,7 @@ log = logging.getLogger(__name__)
 
 
 def template_files(cfg: dict[str, Any]) -> dict[str, Path]:
-    """Template T1 and brain mask from TemplateFlow (downloaded once, then cached)."""
+    """Template T1 and brain mask from TemplateFlow, downloaded once and then cached."""
     os.environ["TEMPLATEFLOW_HOME"] = str(resolve_path(cfg, "templateflow"))
     import templateflow.api as tf  # imported after TEMPLATEFLOW_HOME is set: it reads it at import
 
@@ -58,7 +59,7 @@ def template_files(cfg: dict[str, Any]) -> dict[str, Path]:
 
 
 def subject_t1(cfg: dict[str, Any], sub: str) -> dict[str, Path]:
-    """N4-corrected T1 and its brain mask (preproc.bias, preproc.brainmask)."""
+    """Paths of the N4-corrected T1 and of its brain mask."""
     d = resolve_path(cfg, "derivatives") / PIPELINE / sub / "anat"
     return {
         "t1_n4": d / f"{sub}_desc-n4_T1w.nii.gz",
@@ -78,7 +79,7 @@ def done(cfg: dict[str, Any], sub: str) -> bool:
 
 
 def register_subject(sub: str, config_path: str | None = None) -> dict[str, Any]:
-    """SyN of one subject; runs in a guarded child process."""
+    """Register one subject. Runs in a guarded child process."""
     import ants
     import numpy as np
 
@@ -117,7 +118,7 @@ def register_subject(sub: str, config_path: str | None = None) -> dict[str, Any]
 
 
 def interleaved(part: pd.DataFrame) -> list[str]:
-    """Subjects with the scanners alternated: a run stopped early still covers every site."""
+    """Subjects ordered with the scanners alternated, so that a run stopped early still covers every site."""
     by_scanner = [g.participant_id.tolist() for _, g in part.groupby("scanner")]
     return [s for group in itertools.zip_longest(*by_scanner) for s in group if s]
 

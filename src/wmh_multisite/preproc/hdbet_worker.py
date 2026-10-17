@@ -1,11 +1,11 @@
-"""HD-BET worker: brain masks for a batch of T1 images, on the local GPU.
+"""HD-BET worker: brain masks for a batch of T1 images on the local GPU.
 
-Run by path from ``preproc/brainmask.py`` in a temporary uv environment with CUDA PyTorch and HD-BET,
-so it may only import the standard library, torch and HD_BET, never ``wmh_multisite``.
+It is run by path from preproc/brainmask.py, in a temporary uv environment with a CUDA PyTorch and HD-BET. For
+that reason it may only import the standard library, torch and HD_BET, never wmh_multisite.
 
 Usage (normally not called by hand):
     python hdbet_worker.py jobs.json
-with jobs.json = {"pairs": [[input_t1, output_mask], ...], "vram_cap_gb": 5.5, "tta": true}
+where jobs.json is {"pairs": [[input_t1, output_mask], ...], "vram_cap_gb": 5.5, "tta": true}
 """
 
 import json

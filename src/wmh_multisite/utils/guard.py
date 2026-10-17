@@ -1,12 +1,9 @@
-"""Memory watchdog for heavy jobs (the local machine froze twice without it).
+"""Memory watchdog for heavy jobs.
 
-Two entry points:
-- ``run_guarded(cmd)``: run an external command (ANTs CLI, nnU-Net, ...).
-- ``call_guarded(func, *args)``: run a Python function in a child process.
-
-Both poll the resident memory of the whole process tree (and optionally the GPU memory
-reported by nvidia-smi) and kill the tree if a limit is exceeded, so that a runaway job
-fails cleanly instead of freezing the machine.
+The local machine froze twice before this was added. run_guarded runs an external command and call_guarded
+runs a Python function in a child process. Both watch the memory of the whole process tree (and the GPU memory
+reported by nvidia-smi if asked) and kill the tree when a limit is exceeded, so a runaway job fails cleanly
+instead of freezing the machine.
 """
 
 from __future__ import annotations
@@ -40,10 +37,10 @@ class GuardResult:
 
 
 def _tree_rss_gb(proc: psutil.Process) -> float:
-    """RSS of a process and its children; 0 for a process that has already exited.
+    """Resident memory of a process and its children, or 0 if the process has already exited.
 
-    The process can end between any two psutil calls (a fast job): ``children()`` then raises
-    ``NoSuchProcess``; this race used to make the watchdog tests fail intermittently.
+    A fast job can end between two psutil calls, in which case children() raises NoSuchProcess. This used to
+    make the watchdog tests fail from time to time.
     """
     total = 0
     try:
@@ -59,7 +56,7 @@ def _tree_rss_gb(proc: psutil.Process) -> float:
 
 
 def gpu_used_gb() -> float:
-    """Total GPU memory in use (all GPUs), 0.0 if nvidia-smi is unavailable."""
+    """GPU memory in use over all GPUs, or 0.0 if nvidia-smi is not available."""
     if shutil.which("nvidia-smi") is None:
         return 0.0
     out = subprocess.run(
@@ -116,11 +113,11 @@ def _watch(
 def wait_for_free_ram(
     min_free_gb: float, poll_s: float = 5.0, log: Callable[[str], None] | None = None
 ) -> None:
-    """Block until the machine has at least ``min_free_gb`` of available RAM.
+    """Wait until the machine has at least min_free_gb of available RAM.
 
-    Machine-wide safeguard, complementary to the per-job limit: before a new job starts, check the
-    RAM left for everything (other jobs and the user's applications), so that parallel jobs slow
-    down instead of saturating the machine.
+    This complements the per-job limit. Before a new job starts we check the RAM left for everything else
+    (other jobs and the user's applications), so that parallel jobs slow down instead of saturating the
+    machine.
     """
     warned = False
     while psutil.virtual_memory().available / 1e9 < min_free_gb:
@@ -139,7 +136,7 @@ def run_guarded(
     log_path: str | Path | None = None,
     **popen_kwargs: Any,
 ) -> GuardResult:
-    """Run an external command under the watchdog. stdout/stderr go to ``log_path`` if given."""
+    """Run an external command under the watchdog. Its output goes to log_path if given."""
     t0 = time.time()
     log = open(log_path, "w") if log_path else subprocess.DEVNULL
     try:
@@ -174,10 +171,10 @@ def call_guarded(
     poll_s: float = 1.0,
     **kwargs: Any,
 ) -> GuardResult:
-    """Run ``func(*args, **kwargs)`` in a child process under the watchdog.
+    """Run func(*args, **kwargs) in a child process under the watchdog.
 
-    ``func`` must be importable (defined at module level) and its return value picklable,
-    because Windows starts child processes with "spawn".
+    func must be defined at module level and return something picklable, because Windows starts child
+    processes with "spawn".
     """
     t0 = time.time()
     ctx = mp.get_context("spawn")

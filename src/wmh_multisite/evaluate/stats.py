@@ -1,33 +1,26 @@
-"""Uncertainty and comparisons on the test-set metrics.
+"""Confidence intervals and statistical tests on the test-set metrics.
 
-With 10 to 30 test subjects per scanner, a gap between means may just reflect which subjects were
-drawn. Every mean gets a 95 % confidence interval, and every comparison a test.
+With 10 to 30 test subjects per scanner, a gap between two means can simply come from the subjects that
+happened to be drawn. Every mean therefore gets a 95 % confidence interval and every comparison a test. Five
+tables are produced from results/tables/evaluation_<model>.csv:
 
-    results/tables/evaluation_<model>.csv  (one row per test subject and model)
-        |
-        |-- 1. mean + bootstrap CI     per model x group (all, each scanner, seen / unseen) x metric
-        |-- 2. paired comparisons      per pair of models x metric: same subjects, per-subject differences
-        |-- 3. seen vs unseen          per model x metric: different subjects
-        |-- 4. gain on unseen          per pair of ``evaluation.gain_unseen``: is A - B larger on unseen?
-        |-- 5. scanner effect          per model x metric: does the metric differ between the 5 scanners?
-        v
-    results/tables/stats_ci.csv, stats_paired.csv, stats_seen_unseen.csv, stats_gain_unseen.csv,
-    stats_scanner_effect.csv
+- stats_ci.csv: mean and bootstrap CI per model, group (all, each scanner, seen, unseen) and metric. The
+  bootstrap resamples within each scanner, so that a resample cannot shift the mean just by changing the mix
+  of scanners;
+- stats_paired.csv: paired comparisons of two models on the same subjects, which removes each subject's own
+  difficulty. Wilcoxon signed-rank test and bootstrap CI of the mean difference;
+- stats_seen_unseen.csv: unseen minus seen scanners for each model. These are different subjects (20 against
+  90), so the test is Mann-Whitney;
+- stats_gain_unseen.csv: whether the gain of a variant over its base model is larger on the unseen scanners;
+- stats_scanner_effect.csv: Kruskal-Wallis test of each metric across the five scanners.
 
-1. Percentile bootstrap: Dice is bounded and skewed, so no closed formula. Resampling is done within
-   each scanner, so a resample cannot change the scanner mix and move the mean for that reason alone.
-2. Paired comparisons: every model is scored on the same subjects, so per-subject differences cancel
-   each subject's difficulty. Wilcoxon signed-rank test and bootstrap CI of the mean difference. The
-   pairs are taken within each family of ``evaluation.families`` (one question each: the study M1/M2/M3,
-   then the side experiments), and the Holm correction is applied within each family: a side
-   experiment does not weigh on the correction of the study, nor the other way round.
-3. Seen vs unseen scanners: different subjects (90 vs 20), so unpaired. Bootstrap CI of the difference
-   and Mann-Whitney U, Holm within the family of each model (the first family listing it). The 20
-   unseen subjects come from 2 scanners, and without demographics a gap may reflect the population as
-   much as the scanner.
+Tests are grouped into families, one per question, as listed in evaluation.families (the main study M1/M2/M3,
+then each side experiment). The Holm correction is applied within each family, so a side experiment does not
+weigh on the correction of the main study and the other way round.
 
-HD95 is undefined (NaN) when a method predicts nothing: such subjects are left out of that metric only
-(as on the leaderboard) and counted in ``n_missing``.
+HD95 is undefined when a method predicts nothing. Those subjects are left out of that metric only, as on the
+leaderboard, and counted in n_missing. The 20 unseen subjects come from 2 scanners, and without demographic
+data a gap may reflect the population as much as the scanner.
 
 Usage:
     uv run python -m wmh_multisite.evaluate.stats
@@ -52,7 +45,9 @@ log = logging.getLogger(__name__)
 
 
 def holm(pvalues: np.ndarray) -> np.ndarray:
-    """Holm step-down adjustment: k-th smallest p times (m - k + 1), made monotone, capped at 1."""
+    """Holm step-down correction: the k-th smallest p is multiplied by (m - k + 1), kept monotone and capped
+    at 1.
+    """
     p = np.asarray(pvalues, float)
     order = np.argsort(p)
     m = len(p)
@@ -65,7 +60,7 @@ def holm(pvalues: np.ndarray) -> np.ndarray:
 def bootstrap_means(
     values: np.ndarray, strata: np.ndarray, n_boot: int, rng: np.random.Generator
 ) -> np.ndarray:
-    """``n_boot`` means of ``values`` resampled with replacement within each stratum (sizes preserved)."""
+    """Bootstrap means of values, resampled with replacement within each stratum."""
     total = np.zeros(n_boot)
     for s in np.unique(strata):
         v = values[strata == s]
@@ -77,7 +72,7 @@ def bootstrap_means(
 def mean_ci(
     values: np.ndarray, strata: np.ndarray, n_boot: int, level: float, rng: np.random.Generator
 ) -> tuple[float, float, float]:
-    """Mean and percentile bootstrap CI (stratified)."""
+    """Mean and stratified percentile bootstrap CI."""
     boot = bootstrap_means(values, strata, n_boot, rng)
     alpha = (1 - level) / 2
     return float(values.mean()), float(np.quantile(boot, alpha)), float(np.quantile(boot, 1 - alpha))
@@ -91,7 +86,7 @@ def groups(table: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
 
 def ci_table(table: pd.DataFrame, n_boot: int, level: float, seed: int) -> pd.DataFrame:
-    """Block 1: mean and CI per model x group x metric."""
+    """Mean and CI per model, group and metric."""
     rng = np.random.default_rng(seed)
     rows = []
     for model, tm in table.groupby("model"):
@@ -117,7 +112,7 @@ def ci_table(table: pd.DataFrame, n_boot: int, level: float, seed: int) -> pd.Da
 
 
 def model_families(models: list[str], families: dict[str, list[str]] | None) -> dict[str, list[str]]:
-    """Families restricted to the evaluated models; without families, one family of every model."""
+    """Families restricted to the evaluated models. Without families, all models form a single family."""
     if not families:
         return {"all": sorted(models)}
     return {name: [m for m in members if m in models] for name, members in families.items()}
@@ -126,9 +121,11 @@ def model_families(models: list[str], families: dict[str, list[str]] | None) -> 
 def paired_table(
     table: pd.DataFrame, n_boot: int, level: float, seed: int, families: dict[str, list[str]] | None = None
 ) -> pd.DataFrame:
-    """Block 2: per family, pair of models (a - b) and metric, on the subjects both models have.
+    """Paired differences (a - b) for each pair of models in a family and each metric.
 
-    Holm is applied within each family (``p_holm``)."""
+    Only the subjects that both models have are used. The Holm correction (p_holm) is applied within each
+    family.
+    """
     rng = np.random.default_rng(seed)
     wide = table.pivot_table(index=["participant_id", "scanner"], columns="model", values=METRICS)
     out = []
@@ -164,7 +161,7 @@ def paired_table(
 
 
 def first_family(models: list[str], families: dict[str, list[str]] | None) -> dict[str, str]:
-    """model -> the first family that lists it (one family per model, for the per-model tests)."""
+    """First family listing each model, used for the per-model tests."""
     family_of: dict[str, str] = {}
     for family, members in model_families(models, families).items():
         for m in members:
@@ -175,9 +172,10 @@ def first_family(models: list[str], families: dict[str, list[str]] | None) -> di
 def seen_unseen_table(
     table: pd.DataFrame, n_boot: int, level: float, seed: int, families: dict[str, list[str]] | None = None
 ) -> pd.DataFrame:
-    """Block 3: unseen - seen scanners, per model and metric (unpaired).
+    """Unseen minus seen scanners, per model and metric (unpaired).
 
-    Holm (``p_holm``) within the family of each model, the first family that lists it."""
+    The Holm correction is applied within the first family that lists the model.
+    """
     rng = np.random.default_rng(seed)
     alpha = (1 - level) / 2
     family_of = first_family(sorted(table.model.unique()), families)
@@ -212,12 +210,12 @@ def seen_unseen_table(
 
 
 def scanner_effect_table(table: pd.DataFrame, families: dict[str, list[str]] | None = None) -> pd.DataFrame:
-    """Block 5: Kruskal-Wallis test of each metric across the scanners, per model.
+    """Kruskal-Wallis test of each metric across the scanners, per model.
 
-    The ranks of all subjects are compared between scanners; a low p means the metric depends on the
-    scanner (for the threshold, an intensity scale that the normalisation did not align). Holm
-    (``p_holm``) within the family of each model, as for the seen vs unseen tests: a third question
-    asked of the same methods, so a third family (15 tests for the study)."""
+    A low p means the metric depends on the scanner (for the threshold, an intensity scale that the
+    normalisation did not align). As for the seen versus unseen tests, Holm is applied within the family of
+    each model, which gives a third family of 15 tests for the main study.
+    """
     family_of = first_family(sorted(table.model.unique()), families)
     rows = []
     for model, tm in table.groupby("model"):
@@ -242,13 +240,13 @@ def scanner_effect_table(table: pd.DataFrame, families: dict[str, list[str]] | N
 def gain_unseen_table(
     table: pd.DataFrame, pairs: list[list[str]], n_boot: int, level: float, seed: int
 ) -> pd.DataFrame:
-    """Block 4: is the per-subject gain A - B larger on the unseen scanners than on the seen ones?
+    """Is the per-subject gain A - B larger on the unseen scanners than on the seen ones?
 
-    For a variant meant to generalise better (strong augmentation), a gain on all subjects is not the
-    question: the gain should be larger where the scanner was never seen. The per-subject differences
-    A - B of the two groups are compared (Mann-Whitney U), with a bootstrap CI of the difference of
-    their means (each group resampled within its scanners). Each pair is one question asked on the five
-    metrics: Holm (``p_holm``) over its 5 tests."""
+    For a variant meant to generalise better, such as strong augmentation, a gain over all subjects is not the
+    real question. The gain should be larger where the scanner was never seen. We compare the per-subject
+    differences A - B of the two groups with a Mann-Whitney test and give a bootstrap CI of the difference of
+    their means. Each pair is one question asked on the five metrics, so Holm is applied over its 5 tests.
+    """
     rng = np.random.default_rng(seed)
     alpha = (1 - level) / 2
     rows = []
@@ -289,7 +287,7 @@ def gain_unseen_table(
 
 
 def load_evaluations(cfg: dict[str, Any]) -> pd.DataFrame:
-    """All ``evaluation_<model>.csv`` tables (summaries excluded), test split only."""
+    """All evaluation_<model>.csv tables except the summaries, test split only."""
     files = sorted(
         f
         for f in (resolve_path(cfg, "results") / "tables").glob("evaluation_*.csv")

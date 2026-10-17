@@ -1,21 +1,22 @@
-"""Site classifier and ComBat harmonisation of the NAWM features.
+"""Site classifier and ComBat harmonisation of the normal-appearing white matter features.
 
-Can the scanner be guessed from the image features of the normal-appearing white matter? After
-ComBat, can it still be guessed, and is the biology (WMH load) kept?
+Can the scanner be guessed from features of the normal-appearing white matter, and can it still be guessed
+after ComBat? And is the biological signal (the WMH load) kept?
 
-    nawm_features.csv: 20 features per subject (FLAIR and T1), scales ``none`` and ``zscore``
-      1. site classifier: standardisation + multinomial logistic regression, 5-fold cross-validation
-         stratified by scanner; balanced accuracy (chance = 1 / 5 scanners = 0.20)
-      2. ComBat (neuroHarmonize, empirical Bayes) learnt on the training folds and applied to the test
-         fold of the same cross-validation: the classifier never sees data harmonised with its own
-         test subjects. Biological covariates kept: ln(1 + WMH volume of O1) and the ICV.
-         (Fitting on the 60 training subjects of the challenge is impossible: the 2 unseen scanners
-         have no training subject, and ComBat cannot harmonise a site it has never seen.)
-      3. biology kept? Spearman correlation of each feature with ln(1 + WMH) before and after ComBat
-         (ComBat fitted on all subjects with the covariates), and share of each feature's variance
-         explained by the scanner (eta squared of a one-way ANOVA) before and after
-      v
-    results/tables/harmonization_site_classifier.csv, harmonization_biology.csv
+The site classifier is a standardisation followed by a multinomial logistic regression, evaluated with 5-fold
+cross-validation stratified by scanner. We report the balanced accuracy, for which chance is 1/5.
+
+ComBat (neuroHarmonize) is learnt on the training folds and applied to the test fold of the same
+cross-validation, so the classifier never sees data harmonised with its own test subjects. The protected
+covariates are ln(1 + WMH volume of O1) and the ICV. The challenge's own training set could not be used for
+this, because the 2 unseen scanners have no training subject and ComBat cannot harmonise a site it has never
+seen.
+
+To check that the biology is kept, we compare the Spearman correlation of each feature with ln(1 + WMH) before
+and after ComBat (fitted here on all subjects), and the share of each feature's variance explained by the
+scanner (eta squared).
+
+Outputs: results/tables/harmonization_site_classifier.csv and harmonization_biology.csv.
 
 Usage:
     uv run python -m wmh_multisite.harmonize.combat
@@ -45,7 +46,9 @@ log = logging.getLogger(__name__)
 def combat_learn_apply(
     train_x: np.ndarray, train_cov: pd.DataFrame, test_x: np.ndarray, test_cov: pd.DataFrame
 ) -> tuple[np.ndarray, np.ndarray]:
-    """ComBat learnt on (train_x, train_cov), applied to both sets. ``*_cov``: SITE + numeric covariates."""
+    """Learn ComBat on the training set and apply it to both sets. The covariate tables hold SITE and the
+    covariates.
+    """
     from neuroHarmonize import harmonizationApply, harmonizationLearn
 
     model, train_h = harmonizationLearn(train_x, train_cov)
@@ -56,7 +59,7 @@ def combat_learn_apply(
 def site_classifier(
     x: np.ndarray, site: np.ndarray, cov: pd.DataFrame | None, seed: int, n_splits: int = 5
 ) -> list[float]:
-    """Balanced accuracy per fold; if ``cov`` is given, ComBat is learnt on each training fold."""
+    """Balanced accuracy per fold. If cov is given, ComBat is learnt on each training fold first."""
     folds = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
     scores = []
     for tr, te in folds.split(x, site):

@@ -1,27 +1,21 @@
 """Export of the preprocessed images to the nnU-Net v2 dataset format.
 
-nnU-Net v2 expects (documentation: "dataset_format.md"):
+Each training subject gives two channels on the FLAIR grid, the N4 FLAIR (channel 0) and the N4 T1 registered
+onto it (channel 1), and a label map with 0 for background, 1 for WMH and 2 for other pathology. The images go
+to nnUNet_raw/Dataset001_WMH/imagesTr and the labels to labelsTr.
 
-    nnUNet_raw/Dataset001_WMH/
-        dataset.json
-        imagesTr/WMH_000_0000.nii.gz    channel 0: FLAIR, N4-corrected (FLAIR grid)
-        imagesTr/WMH_000_0001.nii.gz    channel 1: T1w, N4-corrected, registered onto the FLAIR grid
-        labelsTr/WMH_000.nii.gz         0 background, 1 WMH, 2 ignore (uint8, FLAIR grid)
+Case ids keep the challenge id (WMH_000 for sub-000), and case_mapping.csv links each case to its BIDS
+subject, scanner and split. Label 2 is declared as nnU-Net's ignore label, so those voxels count neither in
+the loss nor in the validation, as in the official evaluation (nnU-Net requires the ignore label to be the
+highest one, which it is). Normalisation is left to nnU-Net.
 
-- The case identifier keeps the original challenge id (``WMH_000`` <-> ``sub-000``), and a table
-  ``case_mapping.csv`` gives the correspondence with BIDS, scanner and split.
-- Label 2 ("other pathology" in the challenge) is declared as nnU-Net's *ignore* label: those voxels
-  contribute neither to the loss nor to the validation metric, as in the official evaluation. nnU-Net
-  requires the ignore label to be the highest one, which is the case.
-- Normalization is left to nnU-Net (z-score per image for MRI channels).
-- ``splits_final.json``: 5 cross-validation folds stratified by scanner, so that every validation fold
-  has the same number of subjects from each site. nnU-Net uses this file if it finds it in
-  ``nnUNet_preprocessed/Dataset001_WMH/``; the Kaggle notebook copies it there.
+splits_final.json holds 5 cross-validation folds stratified by scanner and lesion load. nnU-Net uses it when
+it finds it in nnUNet_preprocessed/Dataset001_WMH/, where the Kaggle notebook copies it.
 
-Images are hard links to the derivatives (no extra disk space); labels are rewritten as uint8.
+Images are hard links to the derivatives and the labels are rewritten as uint8.
 
 Usage:
-    uv run python -m wmh_multisite.seg.nnunet            # build + check + zip
+    uv run python -m wmh_multisite.seg.nnunet            # build, check and zip
 """
 
 from __future__ import annotations
@@ -48,17 +42,16 @@ LABELS = {"background": 0, "WMH": 1, "ignore": 2}
 
 
 def case_id(participant_id: str) -> str:
-    """``sub-000`` -> ``WMH_000``."""
+    """nnU-Net case id of a subject, e.g. sub-000 gives WMH_000."""
     return "WMH_" + participant_id.split("-", 1)[1]
 
 
 def stratified_splits(cases: pd.DataFrame, n_folds: int, seed: int) -> list[dict[str, list[str]]]:
-    """K-fold splits stratified by scanner and lesion load, in the format of ``splits_final.json``.
+    """Cross-validation folds stratified by scanner and lesion load, in the splits_final.json format.
 
-    Inside each scanner, cases are sorted by WMH volume and cut into consecutive blocks of
-    ``n_folds`` cases of similar load; each block is dealt to the folds in a random order (fixed
-    seed). Every validation fold thus receives ``n_per_scanner / n_folds`` subjects of each scanner
-    (4 here) spanning the whole range of lesion loads.
+    Within each scanner the cases are sorted by WMH volume and cut into blocks of n_folds cases with a similar
+    load, and each block is dealt to the folds in a random order (fixed seed). Every validation fold thus gets
+    the same number of subjects from each scanner (4 here), covering the whole range of lesion loads.
     """
     rng = np.random.default_rng(seed)
     fold_of: dict[str, int] = {}
@@ -91,7 +84,7 @@ def dataset_json(cfg: dict[str, Any], n_training: int) -> dict[str, Any]:
 
 
 def check_case(flair: Path, t1: Path, label: Path) -> dict[str, Any]:
-    """Same grid for the three files, labels in {0, 1, 2}. Raises if not."""
+    """Check that the three files share the same grid and that the labels are 0, 1 or 2. Raises otherwise."""
     for other in (t1, label):
         if not io.same_grid(flair, other):
             raise ValueError(f"{other.name} is not on the grid of {flair.name}")
@@ -104,7 +97,7 @@ def check_case(flair: Path, t1: Path, label: Path) -> dict[str, Any]:
 
 
 def build(cfg: dict[str, Any], split: str = "training") -> Path:
-    """Write ``nnUNet_raw/<dataset>/`` for the subjects of ``split`` (only 'training' has labels)."""
+    """Write nnUNet_raw/<dataset>/ for the subjects of split (only the training split has labels)."""
     nn = cfg["segmentation"]["nnunet"]
     bids = resolve_path(cfg, "bids")
     deriv = resolve_path(cfg, "derivatives") / PIPELINE
@@ -161,7 +154,7 @@ def build(cfg: dict[str, Any], split: str = "training") -> Path:
 
 
 def zip_dataset(root: Path) -> Path:
-    """Archive for the Kaggle upload (images are already gzip-compressed: store, do not recompress)."""
+    """Archive for the Kaggle upload. The images are already compressed, so they are stored as is."""
     archive = root.parent.parent / f"{root.name}.zip"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_STORED) as z:
         for path in sorted(root.rglob("*")):

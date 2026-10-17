@@ -1,23 +1,22 @@
 """Intensity normalisation of the FLAIR.
 
-MRI intensities have no unit: the same tissue reads 400 on one scanner and 900 on another, so the M3
-threshold and the NAWM features need a common scale. All four methods work inside the HD-BET brain
-mask, since a head mask (with or without the face) would differ between sites:
+MRI intensities have no unit: the same tissue can read 400 on one scanner and 900 on another. The M3 threshold
+and the white matter features therefore need a common scale. The four methods below all work inside the HD-BET
+brain mask, since a head mask would differ between sites.
 
-    none        I / C, C = median of the training brains (one constant for everybody: no per-image
-                correction; the baseline that shows what normalisation brings)
-    zscore      (I - median) / (1.4826 MAD), over the brain of the image (as in M3)
-    whitestripe WhiteStripe (Shinohara et al. 2014): the main mode of the smoothed brain histogram (the
-                white matter), then the "stripe" of brain voxels whose quantile lies within +/- tau = 5 %
-                of the mode's quantile; (I - mean) / SD of that stripe. A first version used the mean and
-                SD of the whole WMH-SynthSeg white matter; the narrow stripe leaves out partial-volume and
-                atypical voxels and gave a better threshold (Dice 0.611 vs 0.564)
-    histmatch   piecewise-linear mapping of the brain percentiles (1, 10, 20, ..., 90, 99) of the image
-                onto a standard scale learnt on the training images (Nyul and Udupa 2000): each training
-                image's [p1, p99] is mapped linearly onto [0, 100], and the standard landmarks are the
-                means of the mapped percentiles
+- none divides every image by the same constant, the median of the training brains. It applies no per-image
+  correction and serves as the baseline.
+- zscore is the robust z-score (I - median) / (1.4826 MAD) over the brain of the image, as in M3.
+- whitestripe (Shinohara et al., 2014) finds the main mode of the smoothed brain histogram, which is the white
+  matter, and keeps the brain voxels whose quantile is within 5 % of the mode's quantile. The image is then
+  centred and scaled with the mean and SD of that stripe. An earlier version used the whole WMH-SynthSeg white
+  matter, but the narrow stripe leaves out partial-volume voxels and gave a better threshold (Dice 0.611
+  instead of 0.564).
+- histmatch (Nyul and Udupa, 2000) maps the brain percentiles 1, 10, 20, ..., 90, 99 of each image
+  piecewise-linearly onto a standard scale. That scale is learnt on the training images by mapping each one's
+  [p1, p99] onto [0, 100] and averaging the landmarks.
 
-The constant of ``none`` and the landmarks of ``histmatch`` are learnt on the training set only.
+The constant of none and the landmarks of histmatch are learnt on the training set only.
 """
 
 from __future__ import annotations
@@ -44,11 +43,12 @@ def zscore(image: np.ndarray, brain: np.ndarray) -> np.ndarray:
 def whitestripe(
     image: np.ndarray, brain: np.ndarray, labels: np.ndarray | None = None, tau: float = WHITESTRIPE_TAU
 ) -> np.ndarray:
-    """WhiteStripe: mean and SD of the voxels around the main mode of the brain histogram.
+    """Mean and SD of the WhiteStripe voxels, around the main mode of the brain histogram.
 
-    The histogram (1000 bins between the 0.5th and 99.5th brain percentiles) is smoothed, its main mode
-    taken as the white-matter intensity, and the stripe is the brain voxels whose quantile lies within
-    ``tau`` of that mode's quantile. ``labels`` is unused (kept for a uniform call).
+    The histogram has 1000 bins between the 0.5th and 99.5th brain percentiles and is smoothed before its main
+    mode is taken as the white matter intensity. The stripe is made of the brain voxels whose quantile is
+    within tau of that mode's quantile. labels is not used and only kept so that all methods share the same
+    signature.
     """
     from scipy import ndimage
 
@@ -70,13 +70,13 @@ def landmarks(image: np.ndarray, brain: np.ndarray) -> np.ndarray:
 
 
 def fit_histogram_standard(landmark_sets: list[np.ndarray]) -> np.ndarray:
-    """Standard landmarks: every image's [p1, p99] mapped onto [0, 100], landmarks averaged."""
+    """Standard landmarks: each image's [p1, p99] mapped onto [0, 100], then the landmarks averaged."""
     mapped = [100 * (lm - lm[0]) / (lm[-1] - lm[0]) for lm in landmark_sets]
     return np.mean(mapped, axis=0)
 
 
 def histmatch(image: np.ndarray, brain: np.ndarray, standard: np.ndarray) -> np.ndarray:
-    """Piecewise-linear map of the image landmarks onto the standard ones; linear extrapolation outside."""
+    """Map the image landmarks piecewise-linearly onto the standard ones, extrapolating linearly outside."""
     lm = landmarks(image, brain)
     out = np.interp(image, lm, standard)
     lo_slope = (standard[1] - standard[0]) / (lm[1] - lm[0])
@@ -93,7 +93,7 @@ def normalize(
     params: dict[str, Any],
     labels: np.ndarray | None = None,
 ) -> np.ndarray:
-    """``image`` on the common scale of ``method`` (``params``: learnt on the training set)."""
+    """Put image on the common scale of method, with params learnt on the training set."""
     if method == "none":
         return (image / params["constant"]).astype(np.float32)
     if method == "zscore":
@@ -106,7 +106,7 @@ def normalize(
 
 
 def fit(method: str, images: list[tuple[np.ndarray, np.ndarray]]) -> dict[str, Any]:
-    """Parameters of ``method`` learnt on (image, brain) pairs of the training set."""
+    """Learn the parameters of method from (image, brain) pairs of the training set."""
     if method == "none":
         return {"constant": float(np.median([np.median(im[b]) for im, b in images]))}
     if method == "histmatch":

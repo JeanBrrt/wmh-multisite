@@ -1,13 +1,10 @@
-"""NIfTI input/output: the only way the pipeline reads and writes images.
+"""Reading and writing NIfTI images. The whole pipeline goes through these functions.
 
-Pitfalls it guards against:
-- an array without its affine is meaningless: saving with the wrong affine moves the image silently;
-- two arrays with the same shape are not necessarily on the same grid;
-- ``get_fdata()`` returns float64 by default (4x the disk size of uint16 data);
-- label maps of the challenge are stored as float32 and must become integers;
-- qform and sform can disagree, and different libraries do not pick the same one.
+They exist to avoid a few classic mistakes: saving an array with the wrong affine silently moves the image,
+two arrays of the same shape are not necessarily on the same grid, get_fdata() returns float64 by default, the
+challenge label maps are stored as float32 and must become integers, and the qform and sform can disagree.
 
-Every function accepts either a path or an already loaded ``nib.Nifti1Image`` (type ``ImageLike``).
+Every function accepts either a path or an image already loaded with nibabel.
 """
 
 from __future__ import annotations
@@ -25,20 +22,19 @@ NIFTI_SUFFIXES = (".nii", ".nii.gz")
 
 
 def _as_image(img: ImageLike) -> nib.Nifti1Image:
-    """Return ``img`` unchanged if it is already an image, otherwise ``load(img)``."""
+    """Return img as is if it is already an image, otherwise load it."""
     if not isinstance(img, nib.Nifti1Image):
         return load(img)
     return img
 
 
 def load(path: str | os.PathLike) -> nib.Nifti1Image:
-    """Open a NIfTI file lazily (header only; voxels are read on first access).
+    """Open a NIfTI file lazily: only the header is read until the voxels are needed.
 
     Raises:
         FileNotFoundError: the file does not exist.
         ValueError: the file name does not end with .nii or .nii.gz.
-        nibabel.filebasedimages.ImageFileError: the file is not a readable NIfTI (raised by nibabel,
-            whose message already names the file).
+        nibabel.filebasedimages.ImageFileError: the file is not a readable NIfTI.
     """
     path = Path(path)
     if not path.is_file():
@@ -49,21 +45,21 @@ def load(path: str | os.PathLike) -> nib.Nifti1Image:
 
 
 def load_data(img: ImageLike, dtype: np.dtype | type = np.float32) -> np.ndarray:
-    """Return the voxel array as ``dtype`` (float32 by default), scaling applied.
+    """Voxel array as dtype (float32 by default), with the scaling applied.
 
-    Never returns float64 unless explicitly asked: a 1 mm T1 weighs 100 MB in float64.
+    float64 is only returned when explicitly asked for, since a 1 mm T1 takes 100 MB in float64.
     """
     return _as_image(img).get_fdata(dtype=dtype, caching="unchanged")
 
 
 def load_labels(img: ImageLike, allowed: tuple[int, ...] = (0, 1, 2), atol: float = 1e-3) -> np.ndarray:
-    """Return a label map as uint8.
+    """Label map as uint8.
 
-    Values must be (almost) integers and belong to ``allowed``; anything else means the file
-    is not a label map, or was interpolated linearly somewhere upstream.
+    The values must be integers (up to atol) and belong to allowed. Anything else means the file is not a
+    label map, or was interpolated linearly at some point.
 
     Raises:
-        ValueError: a value is not within ``atol`` of an integer, or is not in ``allowed``.
+        ValueError: a value is not close to an integer, or is not in allowed.
     """
     img = _as_image(img)
     name = img.get_filename() or "in-memory image"
@@ -92,13 +88,13 @@ def load_labels(img: ImageLike, allowed: tuple[int, ...] = (0, 1, 2), atol: floa
 def save_like(
     data: np.ndarray, reference: ImageLike, path: str | os.PathLike, dtype: np.dtype | type | None = None
 ) -> Path:
-    """Save ``data`` with the geometry (affine and header) of ``reference``.
+    """Save data with the affine and header of reference, and return the written path.
 
-    ``data`` must have the spatial shape of ``reference``. The on-disk type is ``dtype`` if
-    given, else ``data.dtype``. Parent folders are created. Returns the written path.
+    data must have the spatial shape of reference. It is saved as dtype if given, otherwise as data.dtype, and
+    missing parent folders are created.
 
     Raises:
-        ValueError: shape mismatch between ``data`` and ``reference``, or ``path`` is not .nii/.nii.gz.
+        ValueError: the shapes differ, or path does not end with .nii or .nii.gz.
     """
     reference = _as_image(reference)
     data = np.asarray(data)
@@ -129,7 +125,7 @@ def save_like(
 
 
 def same_grid(a: ImageLike, b: ImageLike, atol: float = 1e-3) -> bool:
-    """True if ``a`` and ``b`` share spatial shape and affine (within ``atol`` mm).
+    """True if a and b have the same spatial shape and the same affine (up to atol mm).
 
     Call it before any voxel-wise comparison (Dice, difference, overlay).
     """
@@ -138,16 +134,16 @@ def same_grid(a: ImageLike, b: ImageLike, atol: float = 1e-3) -> bool:
 
 
 def voxel_volume_mm3(img: ImageLike) -> float:
-    """Exact voxel volume (mm3) from the header; ``describe`` rounds voxel sizes for display only."""
+    """Exact voxel volume in mm3, from the header (describe rounds the voxel sizes for display)."""
     return float(np.prod(np.asarray(_as_image(img).header.get_zooms()[:3], dtype=np.float64)))
 
 
 def describe(img: ImageLike, with_stats: bool = False) -> dict[str, Any]:
-    """Summarize an image for QC tables (used by the BIDS conversion).
+    """Summary of an image for the QC tables, used by the BIDS conversion.
 
-    Keys: shape, voxel_size_mm, axcodes, dtype_on_disk, qform_code, sform_code, qform_sform_agree
-    (None when fewer than two of the forms are valid). With ``with_stats``: min, p1, p50, p99,
-    max of the finite voxel values (reads the data). Values are plain Python types (JSON-ready).
+    Gives the shape, voxel size, orientation, on-disk type, qform and sform codes and whether the two forms
+    agree (None when fewer than two are valid). With with_stats it also reads the data and adds the min, 1st
+    percentile, median, 99th percentile and max of the finite values. All values are plain Python types.
     """
     img = _as_image(img)
     header = img.header

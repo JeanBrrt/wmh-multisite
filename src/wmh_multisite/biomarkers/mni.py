@@ -1,24 +1,16 @@
 """Lesion frequency maps in MNI space, per site and per source.
 
-Where do the WMH lie, in a common space, for each site and each segmentation method?
+Each lesion mask (label 2 of O1 removed, as everywhere) is first brought back to the raw T1 grid with the
+inverse of the rigid transform, then to the 2 mm MNI152NLin2009cAsym template with the affine and SyN
+transforms of preproc.mni. Both resamplings are linear, so a template voxel half covered by a lesion gets 0.5
+instead of being rounded. A frequency map is the mean of these fractions over the subjects of a group.
 
-    lesion mask of a source (FLAIR grid; label 2 of O1 removed, as everywhere)
-      1. -> raw T1 grid: inverse of the rigid transform
-      2. -> MNI152NLin2009cAsym 2 mm: affine + SyN CC deformation (``preproc.mni``)
-         ``linear`` interpolation both times: a 2 mm voxel half covered by a lesion reads 0.5 (the
-         covered fraction is kept instead of being rounded to 0 or 1)
-      -> sub-XXX_space-MNI152NLin2009cAsym_res-2_label-WMH_desc-<source>_probseg.nii.gz
-    frequency map = mean of these fractions over the subjects of a group (source x site, source x all)
-    agreement of a method with O1 = voxel-wise Pearson correlation of the two maps inside the brain,
-    on the same (test) subjects; difference map (method - O1) shows where a method over-/under-segments
+Two resamplings are used instead of one composed transform because each one reuses a convention already
+checked elsewhere. The small extra smoothing does not matter for a frequency map.
 
-Two resamplings rather than one composed transform: each reuses a convention already checked
-(``qc.iqm.labels_to_t1`` for the inverse rigid, [warp, affine] for the template), for a little extra
-smoothing that does not matter in a frequency map.
-
-Sources: O1 for the 170 subjects (training and test); the models on the 110 test subjects; the experts
-O3 and O4 on the 60 training subjects (human reference for the map agreement, compared with the O1 map
-of the same 60 subjects).
+O1 is mapped for all 170 subjects, the models for the 110 test subjects, and the experts O3 and O4 for the 60
+training subjects. A method is compared with O1 on the same subjects by the voxel-wise Pearson correlation of
+the two maps inside the brain, and a difference map shows where it finds more or fewer lesions.
 
 Usage:
     uv run python -m wmh_multisite.biomarkers.mni
@@ -70,7 +62,7 @@ def output_path(cfg: dict[str, Any], sub: str, source: str) -> Path:
 
 
 def flair_to_mni(mask_flair: Path, wmh: np.ndarray, reg: dict[str, Path], template: Path) -> np.ndarray:
-    """Fraction of each template voxel covered by the WMH (two linear resamplings)."""
+    """Fraction of each template voxel covered by the WMH, after two linear resamplings."""
     import ants
 
     moving = ants.image_read(str(mask_flair), pixeltype="float")
@@ -116,7 +108,7 @@ def subject_maps(task: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def frequency_maps(cfg: dict[str, Any], table: pd.DataFrame) -> dict[tuple[str, str, str], np.ndarray]:
-    """(source, split group, site) -> mean fraction map. Split group: 'training', 'test', or 'all' (O1)."""
+    """Mean fraction map for each source, split group ('training', 'test', or 'all' for O1) and site."""
     import nibabel as nib
 
     maps = {}
@@ -135,7 +127,7 @@ def frequency_maps(cfg: dict[str, Any], table: pd.DataFrame) -> dict[tuple[str, 
 
 
 def map_agreement(maps: dict, brain: np.ndarray) -> pd.DataFrame:
-    """Voxel-wise Pearson correlation of each source's map with the O1 map of the same subjects, per site."""
+    """Voxel-wise Pearson correlation between each source's map and the O1 map of the same subjects."""
     rows = []
     for (source, split_group, site), m in maps.items():
         if source == "O1" or split_group == "all":
@@ -157,7 +149,7 @@ def map_agreement(maps: dict, brain: np.ndarray) -> pd.DataFrame:
 def figure(
     arrays: list[np.ndarray], titles: list[str], template: np.ndarray, path: Path, diff: bool = False
 ) -> None:
-    """Axial slices (through the lateral ventricles) of maps over the template."""
+    """Axial slices through the lateral ventricles, with the maps shown over the template."""
     import matplotlib
 
     matplotlib.use("Agg")

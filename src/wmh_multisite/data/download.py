@@ -1,13 +1,13 @@
 """Download the MICCAI WMH 2017 dataset from DataverseNL (doi:10.34894/AECRSD).
 
-Lists the published files through the Dataverse API, keeps those selected in config.yaml, downloads
-them in parallel into ``data/raw/`` (mirroring the published tree), checks each against its SHA-1 and
-writes ``data/raw/manifest.csv``. Files already present with the right checksum are skipped.
+The published files are listed through the Dataverse API, filtered according to config.yaml and downloaded in
+parallel into data/raw/, which mirrors the published tree. Each file is checked against its SHA-1 and listed
+in data/raw/manifest.csv. Files that are already there with the right checksum are skipped.
 
 Usage:
-    uv run python -m wmh_multisite.data.download --split training   # 60 training subjects first
+    uv run python -m wmh_multisite.data.download --split training   # the 60 training subjects first
     uv run python -m wmh_multisite.data.download                     # everything (~5 GB)
-    uv run python -m wmh_multisite.data.download --dry-run           # list what would be downloaded
+    uv run python -m wmh_multisite.data.download --dry-run           # only list what would be downloaded
 """
 
 from __future__ import annotations
@@ -56,12 +56,11 @@ OBSERVER_FILE = re.compile(
 
 
 def sanitize(component: str) -> str:
-    """Make one published folder/file name safe on every operating system.
+    """Make a published file or folder name safe on every operating system.
 
-    Windows silently drops trailing dots and spaces from names, so the published folder
-    "Philips_VU .PETMR_01." would be written as "Philips_VU .PETMR_01" and the mirror would no
-    longer match the remote tree. Spaces become "_", and a trailing dot becomes "_":
-    "Philips_VU .PETMR_01." -> "Philips_VU_.PETMR_01_". Other names are unchanged.
+    Windows silently drops trailing dots and spaces, so the published folder "Philips_VU .PETMR_01." would be
+    written as "Philips_VU .PETMR_01" and would no longer match the remote tree. Spaces and a trailing dot are
+    replaced by "_", which gives "Philips_VU_.PETMR_01_". Other names are left unchanged.
     """
     clean = component.replace(" ", "_")
     if clean.endswith("."):
@@ -78,12 +77,12 @@ class RemoteFile:
 
     @property
     def local_path(self) -> Path:
-        """Path relative to data/raw/, with every component sanitized."""
+        """Path relative to data/raw/, with every part of it sanitized."""
         return Path(*(sanitize(part) for part in self.remote_path.split("/")))
 
 
 def list_remote_files(api_url: str, session: requests.Session) -> tuple[str, list[RemoteFile]]:
-    """Return (dataset version, every published file) from the Dataverse API."""
+    """Dataset version and list of published files, from the Dataverse API."""
     response = session.get(api_url, timeout=60)
     response.raise_for_status()
     latest = response.json()["data"]["latestVersion"]
@@ -110,10 +109,8 @@ def select_files(
 ) -> list[RemoteFile]:
     """Keep the files the pipeline needs.
 
-    - subject files whose path inside the subject folder is in ``keep`` (e.g. "orig/FLAIR.nii.gz");
-    - annotations of the listed ``observers``;
-    - top-level ``extra_files`` (e.g. "readme.pdf").
-    Only subjects of the requested ``splits`` are kept.
+    That is the subject files listed in keep (for example "orig/FLAIR.nii.gz"), the annotations of the listed
+    observers and the top-level extra_files such as readme.pdf, for the requested splits only.
     """
     keep, observers, extra_files, splits = set(keep), set(observers), set(extra_files), set(splits)
     selected = []
@@ -130,7 +127,7 @@ def select_files(
 
 
 def sha1_of(path: Path) -> str:
-    """SHA-1 of a file, read by chunks (constant memory)."""
+    """SHA-1 of a file, read in chunks."""
     digest = hashlib.sha1()
     with open(path, "rb") as fh:
         while chunk := fh.read(CHUNK_BYTES):
@@ -142,7 +139,7 @@ _thread_local = threading.local()
 
 
 def _session() -> requests.Session:
-    """One HTTP session per worker thread (requests.Session is not guaranteed thread-safe)."""
+    """One HTTP session per thread, since requests.Session is not guaranteed to be thread-safe."""
     if not hasattr(_thread_local, "session"):
         _thread_local.session = requests.Session()
     return _thread_local.session
@@ -151,10 +148,10 @@ def _session() -> requests.Session:
 def download_file(
     rf: RemoteFile, raw_dir: Path, file_url: str, retries: int = 3, verify_existing: bool = True
 ) -> str:
-    """Download one file into ``raw_dir`` and check its SHA-1. Returns "present" or "downloaded".
+    """Download one file into raw_dir and check its SHA-1. Returns "present" or "downloaded".
 
-    The file is streamed to "<name>.part", hashed on the fly, and renamed only if the checksum
-    matches: an interrupted run never leaves a truncated file under the final name.
+    The file is written to "<name>.part" and hashed on the fly, then renamed only if the checksum matches, so
+    an interrupted download never leaves a truncated file under the final name.
     """
     dest = raw_dir / rf.local_path
     complete = dest.is_file() and dest.stat().st_size == rf.size
@@ -208,10 +205,10 @@ def download_dataset(
     verify_existing: bool = True,
     dry_run: bool = False,
 ) -> Path | None:
-    """Download the selected files; return the manifest path (None for a dry run).
+    """Download the selected files and return the path of the manifest (None for a dry run).
 
-    Failures do not stop the other downloads: they are recorded in the manifest and reported at
-    the end with a RuntimeError, so a re-run only fetches what is missing.
+    A failed file does not stop the others. Failures are recorded in the manifest and raised together at the
+    end, so running the command again only fetches what is missing.
     """
     ds = cfg["dataset"]
     raw_dir = resolve_path(cfg, "raw")

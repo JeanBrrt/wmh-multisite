@@ -1,39 +1,37 @@
-"""Agreement between predicted and manual biomarkers, overall and per site.
+"""Agreement of the biomarkers with the manual reference, overall and per site.
 
-A clinician or a multi-site study uses one number per patient, the WMH volume. So the question here is
-not voxel overlap but "is the volume right, and equally right on every scanner?". A site-dependent bias
-would create a site effect that has nothing to do with the patients.
+A multi-site study uses one number per patient, mostly the WMH volume, so what matters here is whether that
+number is right and whether it is equally right on every scanner. A bias that depends on the site would show
+up as a site effect that has nothing to do with the patients.
 
-    biomarkers.csv
-      test      : M1, M2, M3 (``biomarkers.agreement_sources``)  vs O1
-      training  : O3, O4 (60)  vs O1   (human reference)
-      shared    : M1, O3, O4 on the 12 fold-0 validation subjects vs O1 (human ceiling, ``shared_cases``)
-        |   per subject: d = ln(rater / O1)        (volumes span 0.8 to 195 ml: errors grow with the
-        |                                           volume, Spearman 0.71 in ml, -0.31 on the log scale)
-        v
-    1. Bland-Altman: bias = mean(d); limits of agreement = 2.5th and 97.5th percentiles of d (d is
-       skewed, so bias +/- 1.96 SD would misplace them), bootstrap CI stratified by scanner; parametric
-       limits, skewness and Shapiro-Wilk p kept for comparison; all back-transformed to ratios
-    2. ICC(A,1), absolute agreement, on ln(value), with a bootstrap CI stratified by scanner
-    3. bias per scanner (bootstrap CI, Wilcoxon against 0, Holm) + Kruskal-Wallis across scanners
-       (one test per rater and biomarker, Holm over all of them):
-       does the bias depend on the site?
-        v
-    results/tables/stats_agreement.csv, stats_agreement_by_scanner.csv, stats_agreement_shared.csv,
-    results/figures/bland_altman_<split>_<rater>.png
+Each source is compared with O1 subject by subject. The models (M1, M2, M3) are compared on the test set, the
+experts O3 and O4 on the training set, and M1, O3 and O4 together on the 12 fold-0 validation subjects that M1
+never saw. Volumes range from under 1 ml to about 200 ml and the error grows with the volume, so everything is
+computed on d = ln(source / O1) and reported back as ratios.
 
-ICC(A,1) (McGraw and Wong 1996, two-way model, absolute agreement, single measure), from the two-way
-ANOVA of the n x k table (subjects x raters):
+For each source and biomarker we compute:
+
+- the Bland-Altman bias (mean of d) and limits of agreement. The limits are the 2.5th and 97.5th percentiles
+  of d rather than bias +/- 1.96 SD, because d is skewed. Both get a bootstrap CI stratified by scanner, and
+  the parametric limits are kept for comparison;
+- the ICC(A,1) of ln(value), also with a stratified bootstrap CI;
+- the bias on each scanner (Wilcoxon test against 0) and a Kruskal-Wallis test across scanners, both with a
+  Holm correction.
+
+ICC(A,1) is the two-way, absolute agreement, single measure ICC of McGraw and Wong (1996):
 
     ICC(A,1) = (MSR - MSE) / (MSR + (k - 1) MSE + k / n (MSC - MSE))
 
-MSR, MSC, MSE: mean squares of rows (subjects), columns (raters) and residual. Unlike the "consistency"
-ICC, a constant bias between raters lowers it.
+where MSR, MSC and MSE are the mean squares of the subjects, the raters and the residual. Unlike the
+consistency ICC, it is lowered by a constant bias between raters.
 
-Biomarkers: ``wmh_ml`` (primary), the periventricular and deep volumes (are the scattered deep lesions
-measured as well as the periventricular plaques?), and ``n_lesions_ge10mm3`` (ln(x + 1), since a count
-can be 0). A volume of 0 has no log: those subjects are dropped and counted in ``n_excluded``. A site
-bias is only "associated" with the site: without demographics, scanner and population are confounded.
+The biomarkers are the WMH volume, the periventricular and deep volumes, and the number of lesions of at least
+10 mm3 (compared as ln(x + 1) since it can be 0). Subjects with a volume of 0 are dropped for that biomarker
+and counted in n_excluded. Without demographic data a site bias can only be said to be associated with the
+site, since scanner and population are confounded.
+
+Outputs: results/tables/stats_agreement.csv, stats_agreement_by_scanner.csv, stats_agreement_shared.csv and
+results/figures/bland_altman_<split>_<rater>.png.
 
 Usage:
     uv run python -m wmh_multisite.biomarkers.agreement
@@ -66,7 +64,7 @@ BIOMARKERS = {
 
 
 def icc_a1(x: np.ndarray) -> float:
-    """ICC(A,1) of an n x k table (rows = subjects, columns = raters)."""
+    """ICC(A,1) of an n x k table, with subjects as rows and raters as columns."""
     n, k = x.shape
     grand = x.mean()
     ss_rows = k * ((x.mean(axis=1) - grand) ** 2).sum()
@@ -77,11 +75,11 @@ def icc_a1(x: np.ndarray) -> float:
 
 
 def bland_altman(d: np.ndarray) -> dict[str, float]:
-    """Bias and 95 % limits of agreement of the differences ``d``.
+    """Bias and 95 % limits of agreement of the differences d.
 
-    ``loa_low`` / ``loa_high``: empirical 2.5th and 97.5th percentiles, the non-parametric limits of
-    Bland and Altman (1999), valid whatever the shape of ``d``. ``loa_param_*``: bias +/- 1.96 SD, which
-    assume a normal, hence symmetric, ``d``; kept to show how far that assumption is from the data.
+    loa_low and loa_high are the empirical 2.5th and 97.5th percentiles (the non-parametric limits of Bland
+    and Altman, 1999), which hold whatever the shape of d. The loa_param columns give bias +/- 1.96 SD, which
+    assume a normal d; they are only kept to show how far that assumption is from the data.
     """
     bias, sd = float(d.mean()), float(d.std(ddof=1))
     low, high = np.percentile(d, [2.5, 97.5])
@@ -102,7 +100,7 @@ def transform(values: pd.Series, kind: str) -> pd.Series:
 
 
 def stratified_indices(strata: np.ndarray, n_boot: int, rng: np.random.Generator) -> np.ndarray:
-    """``n_boot`` x n index arrays, resampled with replacement within each stratum."""
+    """Bootstrap indices, resampled with replacement within each stratum."""
     out = np.empty((n_boot, len(strata)), int)
     col = 0
     for s in np.unique(strata):
@@ -113,7 +111,7 @@ def stratified_indices(strata: np.ndarray, n_boot: int, rng: np.random.Generator
 
 
 def pairs(table: pd.DataFrame, biomarker: str) -> dict[tuple[str, str], pd.DataFrame]:
-    """(split, rater) -> subjects with the rater's value and O1's value (inner join)."""
+    """Subjects that have both a value for the rater and a value for O1, per split and rater."""
     out = {}
     for split, ts in table.groupby("split"):
         wide = ts.pivot_table(index=["participant_id", "scanner"], columns="source", values=biomarker)
@@ -127,7 +125,7 @@ def pairs(table: pd.DataFrame, biomarker: str) -> dict[tuple[str, str], pd.DataF
 def agreement(
     p: pd.DataFrame, kind: str, n_boot: int, level: float, rng: np.random.Generator
 ) -> dict[str, Any]:
-    """Blocks 1 and 2 for one rater vs O1, plus the Kruskal-Wallis test of block 3."""
+    """Bias, limits of agreement, ICC and site test of one rater against O1."""
     ok = (p.rater > 0) & (p.ref > 0) if kind == "log" else pd.Series(True, index=p.index)
     q = p[ok]
     if len(q) < MIN_SUBJECTS:
@@ -169,7 +167,7 @@ def agreement(
 
 
 def kruskal_p(groups: list[np.ndarray]) -> float:
-    """Kruskal-Wallis p across the scanners; NaN with a single scanner or identical values everywhere."""
+    """Kruskal-Wallis p-value across scanners (NaN if there is one scanner or all values are equal)."""
     if len(groups) < 2 or np.ptp(np.concatenate(groups)) == 0:
         return float("nan")
     return float(stats.kruskal(*groups).pvalue)
@@ -178,7 +176,7 @@ def kruskal_p(groups: list[np.ndarray]) -> float:
 def by_scanner(
     p: pd.DataFrame, kind: str, n_boot: int, level: float, rng: np.random.Generator
 ) -> list[dict[str, Any]]:
-    """Block 3: bias per scanner (bootstrap CI, Wilcoxon test against no bias)."""
+    """Bias of each rater on each scanner, with a bootstrap CI and a Wilcoxon test against no bias."""
     ok = (p.rater > 0) & (p.ref > 0) if kind == "log" else pd.Series(True, index=p.index)
     q = p[ok]
     alpha = (1 - level) / 2
@@ -272,12 +270,13 @@ def run(cfg: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
 def shared_cases(
     table: pd.DataFrame, n_boot: int, level: float, rng: np.random.Generator, model: str = "resencm"
 ) -> pd.DataFrame:
-    """Human ceiling of the biomarkers: M1 and the experts O3, O4 against O1 on the same subjects.
+    """Human ceiling of the biomarkers: M1, O3 and O4 against O1 on the same subjects.
 
-    The only training subjects M1 never saw are its fold-0 validation subjects (those with an M1 row in
-    the training split). On so few subjects (12), the 2.5th-97.5th percentiles would just be the extremes:
-    the range of the ratios (min, max) is reported instead, with the bias and the ICC(A,1) and its
-    bootstrap CI. No site test (4 subjects per scanner)."""
+    The only training subjects M1 never saw are its 12 fold-0 validation subjects. With so few subjects the
+    2.5th and 97.5th percentiles would just be the extremes, so we report the range of the ratios instead,
+    along with the bias and the ICC(A,1). There is no site test, since that would leave 4 subjects per
+    scanner.
+    """
     training = table[table.split == "training"]
     shared = set(training[training.source == model].participant_id)
     rows = []

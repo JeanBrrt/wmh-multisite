@@ -1,12 +1,11 @@
 """Position of our methods on the official WMH challenge leaderboard.
 
-Source: the 57-team leaderboard (December 2022) on page 20 of the dataset's ``readme.pdf``
-(DataverseNL), copied to ``results/tables/leaderboard_wmh2017.csv`` (rounded to 2 decimals there).
+The leaderboard of the 57 published teams (December 2022) is taken from page 20 of the dataset's readme.pdf
+and stored, rounded to 2 decimals, in results/tables/leaderboard_wmh2017.csv.
 
-Official ranking (``readme.pdf``, page 23): for each metric averaged over the test scans, the best team
-gets 0, the worst 1, the others linearly in between; the overall rank is the mean over the five
-metrics. A new team can move the best or worst value and so every score, hence each of our methods is
-inserted alone among the 57 teams.
+The official ranking (page 23) gives each metric a score between 0 for the best team and 1 for the worst,
+linearly in between, and averages the five scores. Adding a team can change the best or worst value and
+therefore every score, so each of our methods is inserted alone among the 57 teams.
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ HIGHER_IS_BETTER = {
 
 
 def ranking(teams: pd.DataFrame) -> pd.Series:
-    """Official overall rank score of each row (lower is better), from the mean metrics."""
+    """Official overall score of each row (lower is better), computed from the mean metrics."""
     score = pd.Series(0.0, index=teams.index)
     for metric, higher in HIGHER_IS_BETTER.items():
         v = teams[metric]
@@ -33,7 +32,7 @@ def ranking(teams: pd.DataFrame) -> pd.Series:
 
 
 def position(leaderboard: pd.DataFrame, ours: dict[str, float], name: str) -> dict[str, float]:
-    """Insert one method (mean metrics) among the published teams; its position and per-metric ranks."""
+    """Insert one method among the published teams and return its position and per-metric ranks."""
     teams = pd.concat(
         [leaderboard[["team", *HIGHER_IS_BETTER]], pd.DataFrame([{"team": name, **ours}])], ignore_index=True
     )

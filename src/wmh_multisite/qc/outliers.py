@@ -1,23 +1,24 @@
-"""Atypical images: robust z-scores per scanner + Isolation Forest.
+"""Atypical images: robust z-scores per scanner and an Isolation Forest.
 
-IQMs depend on the scanner (the 2D FLAIRs of Utrecht have almost no WM/GM contrast), so pooled together
-a whole site would be flagged. Each image is judged against the images of its own scanner.
+The IQMs depend strongly on the scanner (the 2D FLAIRs of Utrecht have almost no white/grey matter contrast),
+so with all scanners pooled a whole site would be flagged. Each image is therefore judged against the images
+of its own scanner.
 
-    qc_iqm.csv
-      1. robust z per scanner and modality: z = (x - median_scanner) / (1.4826 MAD_scanner), signed so that
-         a positive z means "worse" (``iqm.DIRECTION``; metrics without a direction use |z|)
-      2. Isolation Forest on these z (FLAIR and T1 together): isolates each subject by random cuts; an
-         atypical subject is isolated in few cuts, including unusual *combinations* that no single IQM shows.
-         The z are clipped at 0 first: like the thresholds, the forest only sees the "worse" side, else it
-         flagged images that were unusually *good* (a very high FBER)
-      3. classes ("not_assessed" if the scanner has fewer than ``min_per_scanner`` images):
-         exclude if max z >= ``z_exclude``; check if max z >= ``z_check`` or Isolation Forest
-         outlier; usable otherwise. A prompt for visual review, never an automatic exclusion.
-      4. validation: do flagged test subjects have a lower Dice for M1?
-      v
-    results/tables/qc_flags.csv
+For each scanner and modality, every IQM becomes a robust z-score, (x - median) / (1.4826 MAD), signed so that
+a positive value always means a worse image. The median and MAD are used instead of the mean and SD because a
+very bad image would pull the mean towards itself and hide.
 
-Median and MAD rather than mean and SD, because a very bad image would pull the mean and hide itself.
+An Isolation Forest is then fitted on these z-scores (FLAIR and T1 together). It isolates subjects with random
+cuts, and an atypical subject is isolated in few cuts, which also catches unusual combinations that no single
+IQM shows. The z-scores are clipped at 0 first so that, like the thresholds, the forest only looks at the
+worse side. Without this it flagged images that were unusually good.
+
+An image is classed as exclude if its largest z is at least z_exclude, as check if it is at least z_check or
+if the forest flags it, and as usable otherwise. Scanners with fewer than min_per_scanner images are not
+assessed. These classes are a prompt for a visual check, never an automatic exclusion. Finally we check
+whether the flagged test subjects get a lower Dice with M1.
+
+Output: results/tables/qc_flags.csv.
 
 Usage:
     uv run python -m wmh_multisite.qc.outliers
@@ -42,10 +43,10 @@ log = logging.getLogger(__name__)
 
 
 def robust_z(values: pd.Series, groups: pd.Series, min_group: int = 1) -> pd.Series:
-    """(x - median) / (1.4826 MAD) within each group; 0 where the group has no spread.
+    """Robust z-score (x - median) / (1.4826 MAD) within each group, 0 where the group has no spread.
 
-    NaN for the groups smaller than ``min_group``: a median and a MAD of a handful of images are too
-    unstable to call an image atypical (with 4 subjects, 3 came out as "exclude").
+    Groups smaller than min_group get NaN, because the median and MAD of a handful of images are too unstable
+    to call an image atypical.
     """
     med = values.groupby(groups).transform("median")
     mad = (values - med).abs().groupby(groups).transform("median") * 1.4826
@@ -54,7 +55,7 @@ def robust_z(values: pd.Series, groups: pd.Series, min_group: int = 1) -> pd.Ser
 
 
 def badness_z(iqm: pd.DataFrame, min_group: int = 1) -> pd.DataFrame:
-    """One column per modality x metric: z per scanner, positive = worse."""
+    """One column per modality and metric: z-score within the scanner, positive meaning worse."""
     cols = {}
     for modality, g in iqm.groupby("modality"):
         g = g.set_index("participant_id")
@@ -65,7 +66,7 @@ def badness_z(iqm: pd.DataFrame, min_group: int = 1) -> pd.DataFrame:
 
 
 def forest_features(z: pd.DataFrame) -> pd.DataFrame:
-    """Isolation Forest input: z clipped at 0 (only the "worse" side counts), missing values as 0."""
+    """Isolation Forest input: z-scores clipped at 0 (only the worse side counts), missing values as 0."""
     return z.clip(lower=0).fillna(0.0)
 
 
@@ -92,7 +93,7 @@ def classify(z: pd.DataFrame, cfg_qc: dict[str, Any], seed: int) -> pd.DataFrame
 
 
 def validate(flags: pd.DataFrame, evaluation: pd.DataFrame) -> dict[str, Any]:
-    """Dice of M1 by QC class on the test subjects, and rank correlation with the outlier score."""
+    """Dice of M1 by QC class on the test subjects, and its rank correlation with the outlier score."""
     m = flags.join(evaluation.set_index("participant_id")[["dice"]], how="inner")
     usable, flagged = m[m.qc_class == "usable"].dice, m[m.qc_class.isin(["check", "exclude"])].dice
     out = {

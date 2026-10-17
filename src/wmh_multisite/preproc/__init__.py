@@ -1,3 +1,3 @@
-"""Preprocessing. Every output goes to data/derivatives/<PIPELINE>/."""
+"""Preprocessing steps. All outputs go to data/derivatives/<PIPELINE>/."""
 
 PIPELINE = "wmh-multisite"

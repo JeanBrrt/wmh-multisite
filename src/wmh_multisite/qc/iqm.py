@@ -1,47 +1,34 @@
 """Image quality metrics (IQMs) of every FLAIR and T1, following MRIQC.
 
-A degraded image (motion, noise, strong bias, ghosts) silently gives a wrong biomarker; IQMs let every
-image be checked before analysis.
+A degraded image (motion, noise, strong bias, ghosting) can silently give a wrong biomarker, so every image is
+measured before the analysis. The formulas are those of MRIQC (Esteban et al., 2017) for its main metrics. As
+in MRIQC, the bias is measured on the N4 field only and the noise and contrast on the image after N4, so the
+bias is not counted twice. The corrected image is scaled so that the white matter median is 1000 and rounded
+to integers before the tissue statistics, as MRIQC does.
 
-The formulas are MRIQC's (Esteban et al. 2017; nipreps/mriqc ``qc/anatomical.py`` and
-``interfaces/anatomical.py``, StructuralQC and Harmonize), for its main IQMs. The bias is measured on
-the N4 field only, noise and contrast on the image after N4, so the bias is not counted twice.
+The metrics, with med, sd and mad the median, standard deviation and MAD of a region:
 
-    raw image / N4 field                               = INU-corrected image
-      x 1000 / median(corrected in eroded WM)          = "harmonized" image (MRIQC Harmonize)
-      rounded to integers for the tissue statistics    (MRIQC summary_stats, rprec_data=0)
+    snr_wm     med_WM / (sd_WM * sqrt(n_WM / (n_WM - 1)))                   higher is better
+    snrd_wm    0.6551364 * med_WM / mad_air (Dietrich et al., 2007)          higher is better
+    cnr        |med_WM - med_GM| / sqrt(sd_air^2 + sd_WM^2 + sd_GM^2)        higher is better
+    cjv        (mad_WM + mad_GM) / |med_WM - med_GM|                         lower is better (T1 only)
+    efc        entropy of the voxel intensities, normalised                  lower is better
+    fber       median(x^2 in the head) / median(x^2 in the air)              higher is better
+    inu_range  |p95 - p5| of the N4 field in the brain                       lower is better
+    fwhm       in-plane smoothness of the raw image, as AFNI 3dFWHMx         lower is better
 
-    per region R: med_R (median), sd_R (standard deviation, ddof 0), mad_R (statsmodels ``mad``, i.e.
-    median |x - med_R| / 0.6745, centred on med_R), n_R (number of voxels)
+Our choices differ from MRIQC in a few places. The tissues come from WMH-SynthSeg instead of Atropos, and the
+WMH plus a margin of qc.wmh_margin_mm are removed from the white matter, otherwise the SNR followed the lesion
+load. The grey matter is the cortex only and is not eroded, since it is only 2 to 3 mm thick. Tissue
+statistics are taken inside the HD-BET brain. The air is everything outside the dilated head except exact
+zeros (defacing), because our FLAIRs are only about 144 mm high and do not contain MRIQC's region above the
+head. The MRIQC classifier is not used, as it was trained on T1 images only.
 
-    snr_wm   med_WM / (sd_WM * sqrt(n_WM / (n_WM - 1)))                    higher is better
-    snrd_wm  0.6551364 * med_WM / mad_air   (sd_air if mad_air <= 1)      higher (Dietrich 2007:
-             0.6551364 = 1 / sqrt(2 / (4 - pi)), air noise is Rayleigh)
-    cnr      |med_WM - med_GM| / sqrt(sd_air^2 + sd_WM^2 + sd_GM^2)        higher
-    cjv      (mad_WM + mad_GM) / |med_WM - med_GM|                         lower (T1 only, see JUDGED)
-    efc      sum(x / b log(x / b)) / (N / sqrt(N) log(1 / sqrt(N))), b = sqrt(sum x^2)   lower
-    fber     median(x^2 in the head) / median(x^2 in the air)              higher
-    inu_range |p95 - p5| of the N4 field in the brain                     lower
-    fwhm     in-plane smoothness (mm) of the RAW image in the brain, as AFNI 3dFWHMx (classic) used
-             by MRIQC: per axis, sqrt(-2 ln 2 / ln(1 - var(first differences) / (2 var))) x voxel
-             size (Forman 1995); motion blurs, so it rises                 lower
-             (in-plane only on the 3 mm 2D FLAIR grids, whose slice thickness would dominate)
+The T1 stays on its own grid, since resampling would smooth its noise and inflate its SNR. The WMH-SynthSeg
+labels are carried to it with the inverse rigid transform.
 
-Deliberate differences from MRIQC:
-- Tissues come from WMH-SynthSeg, not from Atropos. White matter = labels 2/41 eroded like MRIQC
-  Harmonize's WM mask, minus the WMH (label 77) and a ring of ``qc.wmh_margin_mm`` around them
-  (otherwise the SNR tracked the lesion load). Grey matter = cortex only (3/42), not eroded: it is
-  2-3 mm thick and one erosion would leave 14-23 % of it on the FLAIR grid.
-- Tissue statistics inside the HD-BET brain.
-- Air = outside the dilated head, exact zeros excluded (only some FLAIRs are defaced), instead of
-  MRIQC's "hat" above the nasion-inion plane: our FLAIRs only cover ~144 mm in height.
-- No MRIQC classifier: it was trained on T1 only.
-
-The T1 stays on its own grid, since resampling would smooth its noise and inflate its SNR: the
-WMH-SynthSeg labels are carried to it by the inverse rigid transform (``genericLabel``).
-
-Output: ``results/tables/qc_iqm.csv`` (one row per subject and modality). Subjects without the
-WMH-SynthSeg segmentation yet are skipped (logged).
+Output: results/tables/qc_iqm.csv, one row per subject and modality. Subjects without a WMH-SynthSeg
+segmentation are skipped and logged.
 
 Usage:
     uv run python -m wmh_multisite.qc.iqm
@@ -90,23 +77,26 @@ ERODE_STRUCTURE = ndimage.generate_binary_structure(3, 2)
 
 
 def background_mask(image: np.ndarray, head: np.ndarray, margin_vox: int = 3) -> np.ndarray:
-    """Air: outside the head dilated by ``margin_vox`` voxels, exact zeros (defacing) excluded."""
+    """Air: everything outside the head dilated by margin_vox voxels, except exact zeros (defacing)."""
     near_head = ndimage.binary_dilation(head, iterations=margin_vox)
     return ~near_head & (image != 0)
 
 
 def harmonize(corrected: np.ndarray, wm: np.ndarray) -> np.ndarray:
-    """MRIQC Harmonize: scale so that the median of the white matter is 1000.
+    """Scale the image so that the white matter median is 1000, as MRIQC does.
 
-    The ratios below do not depend on the scale, but the integer rounding of the statistics and the
-    ``mad_air > 1`` switch of Dietrich's SNR do: harmonizing first keeps them as in MRIQC.
+    The ratios do not depend on the scale, but the integer rounding of the statistics and the mad_air > 1
+    switch of Dietrich's SNR do, so we scale first to match MRIQC.
     """
     return corrected.astype(np.float64) * (1000.0 / np.median(corrected[wm]))
 
 
 def region_stats(image: np.ndarray, mask: np.ndarray) -> dict[str, float]:
-    """MRIQC ``summary_stats`` for a binary region: median and std of the integer-rounded values,
-    MAD (statsmodels, normalized by 0.6745) of the values around that median, number of voxels."""
+    """MRIQC summary statistics of a region.
+
+    Median and standard deviation of the values rounded to integers, MAD of the values around that median
+    (normalised by 0.6745, as in statsmodels) and number of voxels.
+    """
     from statsmodels.robust.scale import mad
     from statsmodels.stats.weightstats import DescrStatsW
 
@@ -134,7 +124,7 @@ def snr_dietrich(median: float, mad_air: float, sd_air: float) -> float:
 
 
 def efc(image: np.ndarray) -> float:
-    """Entropy focus criterion (MRIQC), over the non-zero voxels, which also drops the defacing zeros."""
+    """Entropy focus criterion of MRIQC, over the non-zero voxels (which also leaves out the defacing)."""
     x = image[image != 0].astype(np.float64)
     n = x.size
     if n < 2:
@@ -153,7 +143,7 @@ def fber(image: np.ndarray, head: np.ndarray, air: np.ndarray) -> float:
 def tissue_iqms(
     corrected: np.ndarray, wm: np.ndarray, gm: np.ndarray, air: np.ndarray, head: np.ndarray
 ) -> dict[str, float]:
-    """All IQMs but the bias one, from the INU-corrected image and its masks (boolean, same grid)."""
+    """All IQMs except the bias one, from the corrected image and its masks."""
     image = harmonize(corrected, wm)
     s_wm, s_gm, s_air = region_stats(image, wm), region_stats(image, gm), region_stats(image, air)
     contrast = abs(s_wm["median"] - s_gm["median"])
@@ -170,11 +160,11 @@ def tissue_iqms(
 
 
 def fwhm(image: np.ndarray, mask: np.ndarray, spacing: tuple[float, ...]) -> float:
-    """In-plane smoothness (mm) of ``image`` inside ``mask``: AFNI 3dFWHMx "classic" estimate.
+    """In-plane smoothness of image inside mask (mm), with the classic AFNI 3dFWHMx estimate.
 
-    For a Gaussian-smoothed noise field, the variance of the differences between neighbours along an
-    axis shrinks as the smoothing grows: FWHM = sqrt(-2 ln 2 / ln(1 - var(d) / (2 var))) x voxel size.
-    Averaged over the in-plane axes when one axis is much coarser (3 mm slices), else over all three.
+    For a smoothed noise field, the variance of the differences between neighbours shrinks as the smoothing
+    grows, which gives FWHM = sqrt(-2 ln 2 / ln(1 - var(d) / (2 var))) times the voxel size. The result is
+    averaged over the in-plane axes when one axis is much coarser (3 mm slices), otherwise over all three.
     """
     x = image.astype(np.float64)
     var = x[mask].var()
@@ -207,10 +197,11 @@ def tissues(
     spacing: tuple[float, ...] = (1.0, 1.0, 1.0),
     wmh_margin_mm: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """White matter (eroded, minus the WMH and a ring of ``wmh_margin_mm`` around them) and cortex.
+    """White matter and cortex masks for the IQMs.
 
-    White matter next to a lesion is often already abnormal; left in, it lowers the SNR of subjects with
-    many lesions. Distances in mm, with the real voxel size (3 mm slices on the FLAIR grid).
+    The white matter is eroded and loses the WMH and a margin of wmh_margin_mm around them, because the white
+    matter next to a lesion is often already abnormal and would lower the SNR of subjects with many lesions.
+    Distances use the real voxel size.
     """
     wm = ndimage.binary_erosion(np.isin(labels, WM_LABELS), structure=ERODE_STRUCTURE) & brain
     wmh = labels == WMH_LABEL
@@ -221,13 +212,13 @@ def tissues(
 
 
 def correct(raw: np.ndarray, field: np.ndarray) -> np.ndarray:
-    """INU-corrected image: raw / N4 field, as in ``bias.n4_correct``."""
+    """Bias-corrected image, raw / N4 field, as in bias.n4_correct."""
     raw = raw.astype(np.float64)
     return np.divide(raw, field, out=np.zeros_like(raw), where=field > 0)
 
 
 def labels_to_t1(t1_raw: Path, labels_1mm: Path, xfm: Path) -> np.ndarray:
-    """WMH-SynthSeg labels (1 mm grid, FLAIR space) carried to the raw T1 grid (inverse rigid transform)."""
+    """WMH-SynthSeg labels carried to the raw T1 grid with the inverse rigid transform."""
     import ants
 
     out = ants.apply_transforms(
@@ -264,7 +255,7 @@ def measure(
     spacing: tuple[float, ...] = (1.0, 1.0, 1.0),
     wmh_margin_mm: float = 0.0,
 ) -> dict[str, float]:
-    """IQMs of one image from its raw version and its N4 field (also used on degraded copies)."""
+    """IQMs of one image from its raw version and its N4 field. Also used on degraded copies."""
     head = head_mask(raw)
     wm, gm = tissues(labels, brain, spacing, wmh_margin_mm)
     out = tissue_iqms(correct(raw, field), wm, gm, background_mask(raw, head), head)

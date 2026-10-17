@@ -1,23 +1,13 @@
-"""Convert the downloaded WMH dataset into a BIDS dataset.
+"""Convert the downloaded dataset to BIDS.
 
-Layout produced in ``data/bids/`` (https://bids-specification.readthedocs.io):
+The raw FLAIR and T1 of each subject go to data/bids/sub-XXX/anat/ with a JSON sidecar. The manual annotations
+(O1, O3, O4) go to derivatives/manual/, and what the organizers provide (their elastix registration, defacing
+masks and SPM12 bias-corrected images) goes to derivatives/challenge/. Subjects keep their challenge id, which
+is unique across sites.
 
-    dataset_description.json, README, participants.tsv, participants.json
-    sub-000/anat/sub-000_FLAIR.nii.gz (+ .json)       raw FLAIR (orig/FLAIR)
-    sub-000/anat/sub-000_T1w.nii.gz   (+ .json)       raw 3D T1, defaced (orig/3DT1)
-    derivatives/manual/                               manual annotations (reference O1, observers O3/O4)
-        sub-000/anat/sub-000_space-FLAIR_desc-O1_dseg.nii.gz
-    derivatives/challenge/                            processing done by the challenge organizers
-        sub-000/anat/sub-000_space-FLAIR_T1w.nii.gz                (3D T1 aligned with elastix)
-        sub-000/anat/sub-000_from-T1w_to-FLAIR_mode-image_xfm.txt  (elastix parameters)
-        sub-000/anat/sub-000_space-T1w_desc-deface_mask.nii.gz     (defacing mask of the 3D T1)
-        sub-000/anat/sub-000_space-FLAIR_desc-deface_mask.nii.gz   (defacing mask of the FLAIR, Amsterdam)
-        sub-000/anat/sub-000_desc-spm12_FLAIR.nii.gz               (bias-corrected FLAIR, pre/)
-        sub-000/anat/sub-000_space-FLAIR_desc-spm12_T1w.nii.gz     (bias-corrected aligned T1, pre/)
-
-Subjects keep their challenge id (unique across sites): ``sub-{id:03d}``. Files are hard links to
-``data/raw/``, or copies if the file system refuses links. A QC inventory (``results/tables/``) records
-the geometry of every image, the validity and grid of the label maps, and the WMH volumes.
+Files are hard links to data/raw/, or copies when the file system does not allow links. An inventory in
+results/tables/ records the geometry of every image, checks the label maps and their grid, and gives the WMH
+volumes.
 
 Usage:
     uv run python -m wmh_multisite.data.bids
@@ -74,14 +64,14 @@ class Subject:
 
 
 def _scanner_by_site(scanners: dict[str, Any]) -> dict[str, str]:
-    """Published site folder ("Amsterdam/GE3T") -> scanner key ("amsterdam_ge_3t")."""
+    """Map a published site folder such as 'Amsterdam/GE3T' to its scanner key."""
     return {cfg["folder"]: key for key, cfg in scanners.items()}
 
 
 def collect_subjects(
     manifest_rows: list[dict[str, str]], raw_dir: Path, scanners: dict[str, Any]
 ) -> list[Subject]:
-    """Group the files of the download manifest by subject (only files downloaded successfully)."""
+    """Group the downloaded files of the manifest by subject."""
     by_site = _scanner_by_site(scanners)
     subjects: dict[int, Subject] = {}
     observer_rows = []
@@ -116,7 +106,7 @@ def collect_subjects(
 
 
 def link_or_copy(src: Path, dst: Path) -> str:
-    """Hard link ``src`` to ``dst`` (no extra disk space); copy if links are not supported."""
+    """Hard link src to dst, or copy it if links are not supported."""
     if dst.exists():
         if dst.stat().st_size == src.stat().st_size:
             return "present"
@@ -136,7 +126,7 @@ def _write_json(path: Path, content: dict[str, Any]) -> None:
 
 
 def sidecar(scanner: dict[str, Any], modality: str) -> dict[str, Any]:
-    """BIDS JSON sidecar of a raw image, from the acquisition protocol in the config (times in s)."""
+    """BIDS JSON sidecar of a raw image, built from the acquisition protocol in the config."""
     proto = scanner["protocol"][modality]
     meta: dict[str, Any] = {
         "Manufacturer": scanner["vendor"],
@@ -161,7 +151,7 @@ def sidecar(scanner: dict[str, Any], modality: str) -> dict[str, Any]:
 
 
 def write_dataset_files(bids_dir: Path, cfg: dict[str, Any]) -> None:
-    """Top-level BIDS files and the description of both derivative datasets."""
+    """Write the top-level BIDS files and the descriptions of the two derivative datasets."""
     ds, version = cfg["dataset"], cfg["bids"]["version"]
     reference = (
         'Kuijf, H. J., et al. "Standardized Assessment of Automatic Segmentation of White Matter '
@@ -252,7 +242,7 @@ def write_participants(bids_dir: Path, subjects: list[Subject], cfg: dict[str, A
 
 
 def convert_subject(subject: Subject, bids_dir: Path, cfg: dict[str, Any]) -> dict[str, Path]:
-    """Link every file of one subject into the BIDS tree; return {key: BIDS path}."""
+    """Link all files of one subject into the BIDS tree and return their BIDS paths."""
     sub = subject.participant_id(cfg["bids"]["subject_naming"])
     scanner = cfg["scanners"][subject.scanner]
     out: dict[str, Path] = {}
@@ -274,7 +264,7 @@ def convert_subject(subject: Subject, bids_dir: Path, cfg: dict[str, Any]) -> di
 
 
 def inventory_row(subject: Subject, paths: dict[str, Path], naming: str) -> dict[str, Any]:
-    """QC of one subject: geometry of the raw images, validity and grid of the label maps, volumes."""
+    """Inventory of one subject: image geometry, label map checks and volumes."""
     flair, t1 = io.describe(paths["orig/FLAIR.nii.gz"]), io.describe(paths["orig/3DT1.nii.gz"])
     row: dict[str, Any] = {
         "participant_id": subject.participant_id(naming),
@@ -321,8 +311,10 @@ def inventory_row(subject: Subject, paths: dict[str, Path], naming: str) -> dict
 
 
 def prune_stale(bids_dir: Path, produced: set[Path]) -> None:
-    """Remove subject files left by a previous run under names that are no longer produced
-    (e.g. after a renaming). Only links/copies inside data/bids are removed, never data/raw."""
+    """Remove subject files left by a previous run under names that are no longer produced.
+
+    Only links or copies inside data/bids are removed, never anything in data/raw.
+    """
     stale = [
         p
         for p in bids_dir.rglob("sub-*/anat/*")
@@ -335,7 +327,7 @@ def prune_stale(bids_dir: Path, produced: set[Path]) -> None:
 
 
 def convert(cfg: dict[str, Any]) -> Path:
-    """Build data/bids from data/raw (download manifest); return the inventory path."""
+    """Build data/bids from data/raw and return the path of the inventory."""
     raw_dir, bids_dir = resolve_path(cfg, "raw"), resolve_path(cfg, "bids")
     manifest = raw_dir / "manifest.csv"
     if not manifest.is_file():

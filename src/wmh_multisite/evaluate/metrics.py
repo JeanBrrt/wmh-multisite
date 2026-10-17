@@ -1,21 +1,19 @@
 """Evaluation of the segmentations with the official challenge metrics.
 
-For each subject, the prediction (FLAIR grid, 0/1) is compared with the manual reference standard
-(O1, FLAIR grid, 0 background / 1 WMH / 2 other pathology) by the official functions vendored in
-``wmh_challenge.py``:
+Each prediction (0/1 on the FLAIR grid) is compared with the reference O1 (0 background, 1 WMH, 2 other
+pathology) using the official functions copied in wmh_challenge.py:
 
-- Dice: voxel overlap, 2|A n B| / (|A| + |B|).
-- HD95 (mm): 95th percentile of the boundary distances, the larger of the two directions. NaN if
-  nothing is predicted.
-- AVD (%): absolute difference of total WMH volume, relative to the true volume.
-- Lesion recall: share of the true lesions (26-connected components) touched by a predicted voxel.
-- Lesion F1: harmonic mean of that recall and the lesion precision.
+- Dice, the voxel overlap 2|A n B| / (|A| + |B|);
+- HD95 in mm, the 95th percentile of the distances between the two boundaries, taking the worse of the two
+  directions (NaN when nothing is predicted);
+- AVD in %, the absolute difference in total WMH volume relative to the true volume;
+- lesion recall, the share of true lesions (26-connected components) touched by the prediction;
+- lesion F1, the harmonic mean of that recall and the lesion precision.
 
-Voxels of label 2 are removed from the prediction before every metric (``getImages``), as in the
-challenge. The leaderboard averages each metric over the test scans (HD95 NaN cases aside).
+As in the challenge, voxels labelled 2 are removed from the prediction before every metric.
 
-Output: ``results/tables/evaluation_<model>.csv`` (one row per subject, with scanner, split and
-whether the scanner was seen in training).
+Output: results/tables/evaluation_<model>.csv, one row per subject with its scanner, split and whether the
+scanner was seen in training.
 
 Usage:
     uv run python -m wmh_multisite.evaluate.metrics --model resencm --split test
@@ -45,11 +43,11 @@ METRICS = ["dice", "hd95_mm", "avd_pct", "lesion_recall", "lesion_f1"]
 
 
 def evaluate_case(truth: str | Path, prediction: str | Path) -> dict[str, float]:
-    """The five official metrics for one subject, plus the true and predicted WMH volumes (ml).
+    """The five official metrics for one subject, plus the true and predicted WMH volumes in ml.
 
-    The reference is passed as float32: on an integer map, SimpleITK casts the thresholds of the
-    official ``BinaryThreshold(test, 0.5, 1.5)`` to 0 and 1, every voxel becomes WMH and all metrics
-    silently collapse. The challenge files are float32, so the leaderboard itself is fine.
+    The reference must be passed as float32. On an integer image SimpleITK rounds the thresholds of the
+    official BinaryThreshold(test, 0.5, 1.5) to 0 and 1, every voxel becomes WMH and all metrics are silently
+    wrong. The challenge files are float32, so the published leaderboard is not affected.
     """
     with tempfile.TemporaryDirectory() as tmp:
         truth_f32 = Path(tmp) / "truth_float32.nii.gz"
@@ -115,7 +113,7 @@ def evaluate(cfg: dict[str, Any], subjects: list[str], model: str, jobs: int = 4
 
 
 def summarize(table: pd.DataFrame) -> pd.DataFrame:
-    """Mean of each metric overall, by scanner and by seen/unseen scanner (leaderboard convention)."""
+    """Mean of each metric overall, by scanner and for seen versus unseen scanners."""
     groups = {"all": table}
     groups |= {f"scanner={k}": g for k, g in table.groupby("scanner")}
     groups |= {f"seen={k}": g for k, g in table.groupby("seen_in_training")}
