@@ -192,10 +192,8 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
     cfg = load_config(args.config)
-    from wmh_multisite.preproc import atlas
-
     m = cfg["biomarkers"]["mni"]
-    tpl = atlas.template_files(preproc_mni.template_cfg(cfg))
+    tpl = preproc_mni.template_files(cfg)
     part = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t").set_index("participant_id")
     tasks, skipped = [], []
     for sub, row in part.iterrows():

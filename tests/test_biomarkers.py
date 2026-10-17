@@ -110,12 +110,12 @@ def test_ventricle_source_priority(tmp_path, monkeypatch):
     from wmh_multisite.biomarkers import table
 
     monkeypatch.setattr(table, "resolve_path", lambda cfg, key: tmp_path)
-    cfg = {"biomarkers": {"ventricles": ["ventriclessynthseg", "ventricles"]}}
+    cfg = {"biomarkers": {"ventricles": ["ventriclessynthseg", "ventricles"]}}  # any priority list
     anat = tmp_path / table.PIPELINE / "sub-x" / "anat"
     anat.mkdir(parents=True)
     assert table.ventricles_for(cfg, "sub-x") == (None, None)
     (anat / "sub-x_space-FLAIR_desc-ventricles_mask.nii.gz").touch()
-    assert table.ventricles_for(cfg, "sub-x")[0] == "ventricles"  # fallback: atlas ventricles
+    assert table.ventricles_for(cfg, "sub-x")[0] == "ventricles"  # second choice
     (anat / "sub-x_space-FLAIR_desc-ventriclessynthseg_mask.nii.gz").touch()
     assert table.ventricles_for(cfg, "sub-x")[0] == "ventriclessynthseg"  # preferred when present
 

@@ -5,7 +5,7 @@ scattered in the deep white matter. Rule, the most common in automated studies: 
 ``periventricular_distance_mm`` (10 mm) of the lateral ventricles is periventricular, otherwise deep.
 It is voxel-wise, so a confluent plaque reaching far from the ventricle is split between the two.
 
-    WMH mask (any source)          lateral ventricles (WMH-SynthSeg labels 4 + 43, else the atlas ones)
+    WMH mask (any source)          lateral ventricles (WMH-SynthSeg labels 4 + 43)
           |                                      |
           |                       distance (mm) of every voxel to the nearest ventricle voxel,
           |                       with the real voxel size (3 mm slices: counting voxels would make

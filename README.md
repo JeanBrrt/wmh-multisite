@@ -7,7 +7,7 @@
 Données : challenge **MICCAI WMH 2017**, 170 IRM FLAIR + T1 de **5 scanners** sur 3 sites (60 sujets d'entraînement, 110 de test dont 20 issus de 2 scanners absents de l'entraînement).
 
 > [!NOTE]
-> Un rapport détaillé (PDF, en français) décrit la démarche, les méthodes statistiques et l'ensemble des résultats. Ce README n'en donne qu'un aperçu.
+> **[Rapport complet (PDF, en français)](report/rapport.pdf)** : démarche, méthodes statistiques et ensemble des résultats. Ce README n'en donne qu'un aperçu.
 
 ## Questions
 
@@ -42,7 +42,7 @@ Quand les images viennent de centres, d'appareils et de protocoles différents, 
 
 ![Classement MICCAI WMH 2017](results/figures/leaderboard.png)
 
-![Bland-Altman du volume de M1](results/figures/bland_altman_test_resencm.png)
+*Score officiel du challenge des 57 équipes publiées, chaque méthode du projet insérée seule (plus bas = meilleur).*
 
 ## Limites
 
@@ -57,7 +57,7 @@ Quand les images viennent de centres, d'appareils et de protocoles différents, 
 uv sync --extra local                                    # environnement verrouillé (Python 3.12)
 uv run python -m wmh_multisite.data.download             # ~4 Go depuis DataverseNL
 uv run snakemake -s workflow/Snakefile --cores 4         # toute la chaîne locale
-uv run pytest                                            # 164 tests, données synthétiques
+uv run pytest                                            # 165 tests, données synthétiques
 ```
 
 - Deux étapes tournent sur **Kaggle** : les entraînements nnU-Net ([`kaggle/nnunet_training.ipynb`](kaggle/nnunet_training.ipynb)) et WMH-SynthSeg ([`kaggle/wmhsynthseg.ipynb`](kaggle/wmhsynthseg.ipynb)). Le workflow indique quoi lancer si leurs sorties manquent.

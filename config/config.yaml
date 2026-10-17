@@ -114,7 +114,6 @@ bids:
 guard:
   ram_limit_gb: 10
   max_parallel_jobs: 2
-  poll_interval_s: 1.0
   min_free_ram_gb: 4         # machine-wide floor: a new job starts only if this much RAM is available
 
 preproc:
@@ -141,32 +140,17 @@ preproc:
     guard_vram_gb: 6.0     # watchdog limits for one batch (measured on sub-000: 4.1 GB VRAM, 3.2 GB RAM)
     guard_ram_gb: 10.0
     batch_size: 20         # subjects per worker process (model loaded once per batch)
-  atlas:
-    type_of_transform: SyN         # rigid + affine + SyN (ANTs defaults: Mattes MI, flow_sigma 3)
-    template: MNI152NLin2009cAsym  # TemplateFlow, 1 mm
-    resolution: 1
-    ventricle_atlas: {atlas: HOSPA, desc: th25}   # Harvard-Oxford subcortical, 25 % threshold
-    ventricle_labels: [3, 14]      # left / right lateral ventricles (checked: 9 and 8 ml, x = -/+12.7 mm, darkest structures)
-    core_mm: 3                     # atlas ventricles eroded by this distance: certainly CSF (subject CSF intensity)
-    zone_mm: 10                    # refined ventricles searched within this distance of the atlas ventricles
-    tissue_min_mm: 10              # brain tissue sampled at least this far from the atlas ventricles
-    jobs: 4                        # subjects in parallel: 1 thread and ~2 GB RAM each (measured)
-    ram_limit_gb: 4                # per subject: 2x the measured peak (2.0 GB)
-    threads: 1                     # ITK multithreading is not deterministic
-    seed: 42
   mni:                             # SyN to the 2 mm template, for the lesion frequency maps
+    template: MNI152NLin2009cAsym  # TemplateFlow
     resolution: 2                  # MNI152NLin2009cAsym res-02 (8x fewer voxels than 1 mm)
     syn_metric: CC                 # cross-correlation: follows the dilated ventricles of atrophic subjects
     syn_sampling: 2                # CC radius in voxels (~4 mm at 2 mm)
     reg_iterations: [100, 70, 50, 20]
-    output_dir: mni_registration   # under derivatives/wmh-multisite, one folder per subject
     jobs: 4                        # subjects in parallel
     threads: 3                     # ITK threads per subject (not bit-for-bit deterministic)
     seed: 42
 
 qc:
-  outlier_method: isolation_forest
-  classes: [usable, check, exclude]
   min_per_scanner: 8            # fewer images on a scanner: no z-score (class not_assessed)
   z_check: 3                    # robust z per scanner (positive = worse) from which an image is "check"
   z_exclude: 5                  # ... and "exclude" (recommendation for visual control, never automatic)
@@ -182,12 +166,10 @@ qc:
 
 segmentation:
   nnunet:
-    dataset_id: 1
     dataset_name: Dataset001_WMH
     channels: {"0": FLAIR, "1": T1}
     configuration: 3d_fullres
     trainer: nnUNetTrainerWMH_250   # 2nd training: nnUNetTrainerWMH_DA5_250
-    planner: nnUNetPlannerResEncM
     plans: nnUNetResEncUNetMPlans
     models:                     # trained models (folder name = trainer__plans__configuration)
       resencm: {trainer: nnUNetTrainerWMH_250}
@@ -205,7 +187,6 @@ segmentation:
     fold: 0
     n_folds: 5                  # cross-validation splits stratified by scanner
   threshold:                    # M3
-    tuned_on: train             # nothing is tuned on the test set
     grid:                       # one global (t, e, m) maximising the mean training Dice
       z_start: 1.0              # t: robust z-score of the FLAIR inside the brain (median, MAD)
       z_stop: 4.0
@@ -232,13 +213,9 @@ evaluation:
 
 biomarkers:
   periventricular_distance_mm: 10   # WMH voxel within this distance of the lateral ventricles = periventricular
-  ventricles: [ventriclessynthseg, ventricles]   # ventricle masks by priority: WMH-SynthSeg, then atlas
+  ventricles: [ventriclessynthseg]   # ventricle masks by priority (WMH-SynthSeg labels 4 and 43)
   mni:                          # lesion frequency maps (registration: preproc.mni)
     models: [resencm, wmhsynthseg, threshold] # test-set sources mapped besides O1
   min_lesion_mm3: 10            # lesions counted comparably across sites (~2 voxels on the coarsest grid)
   agreement_sources: [resencm, wmhsynthseg, threshold, O3, O4]   # compared with O1 (the side experiment DA5 is left out)
   models: [resencm, threshold, resencm_da5, wmhsynthseg]   # test-set predictions measured when present
-
-harmonization:
-  intensity_methods: [none, zscore, whitestripe, histogram_matching]
-  combat_fit_on: train

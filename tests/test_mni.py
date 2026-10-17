@@ -53,7 +53,7 @@ def test_mni_registration_paths_and_scanner_order(tmp_path):
 
     cfg = load_config()
     paths = mni.registration_paths(cfg, "sub-007")
-    assert {p.parent.name for p in paths.values()} == {"sub-007"}
-    assert paths["affine"].parent.parent.name == cfg["preproc"]["mni"]["output_dir"]
+    assert {p.parent.parent.name for p in paths.values()} == {"sub-007"}
+    assert all(f"_res-{cfg['preproc']['mni']['resolution']}_" in p.name for p in paths.values())
     part = pd.DataFrame({"participant_id": ["a1", "a2", "a3", "b1", "c1", "c2"], "scanner": list("aaabcc")})
     assert mni.interleaved(part) == ["a1", "b1", "c1", "a2", "c2", "a3"]

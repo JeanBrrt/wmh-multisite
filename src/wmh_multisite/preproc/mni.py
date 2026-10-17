@@ -2,18 +2,18 @@
 
     subject T1 N4, brain only  ---- SyN, cross-correlation ---->  MNI152NLin2009cAsym 2 mm T1, brain only
 
-Separate from the 1 mm registration of ``preproc.atlas`` (Mattes mutual information, used for the
-ventricles). Cross-correlation follows the dilated ventricles of atrophic subjects, which the Mattes
-setting left inside the template contour; it costs much more, and the 2 mm template brings it back to
-~6 min per subject (8x fewer voxels) for a nearly identical result. The settings comparison on a few
+Brain to brain: skull, scalp and neck vary between people and are not in the template.
+Cross-correlation follows the dilated ventricles of atrophic subjects, which the default Mattes mutual
+information left inside the template contour; it costs much more, and the 2 mm template brings it back
+to ~6 min per subject (8x fewer voxels) for a nearly identical result. The settings comparison on a few
 subjects is kept in ``results/tables/mni_syn_settings.csv``.
 
 Several ITK threads per subject make the result very slightly non-deterministic (last digits of the
 deformation); the maps are averaged over tens of subjects, so this does not show in the results.
 
-Outputs, in ``data/derivatives/wmh-multisite/mni_registration/sub-XXX/``:
-    sub-XXX_from-T1w_to-MNI152NLin2009cAsym_mode-image_desc-affine_xfm.mat
-    sub-XXX_from-T1w_to-MNI152NLin2009cAsym_mode-image_desc-warp_xfm.nii.gz
+Outputs, in ``data/derivatives/wmh-multisite/sub-XXX/anat/``:
+    sub-XXX_from-T1w_to-MNI152NLin2009cAsym_res-2_mode-image_desc-affine_xfm.mat
+    sub-XXX_from-T1w_to-MNI152NLin2009cAsym_res-2_mode-image_desc-warp_xfm.nii.gz
 and ``results/tables/mni_registration_qc.csv`` (time, memory, brain correlation with the template).
 A subject whose two transforms exist is skipped.
 
@@ -44,15 +44,32 @@ from wmh_multisite.utils.guard import call_guarded, wait_for_free_ram
 log = logging.getLogger(__name__)
 
 
-def template_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
-    """Configuration whose atlas template is the one of the MNI maps (2 mm)."""
-    atlas = {**cfg["preproc"]["atlas"], "resolution": cfg["preproc"]["mni"]["resolution"]}
-    return {**cfg, "preproc": {**cfg["preproc"], "atlas": atlas}}
+def template_files(cfg: dict[str, Any]) -> dict[str, Path]:
+    """Template T1 and brain mask from TemplateFlow (downloaded once, then cached)."""
+    os.environ["TEMPLATEFLOW_HOME"] = str(resolve_path(cfg, "templateflow"))
+    import templateflow.api as tf  # imported after TEMPLATEFLOW_HOME is set: it reads it at import
+
+    m = cfg["preproc"]["mni"]
+    get = {"resolution": m["resolution"], "extension": ".nii.gz"}
+    return {
+        "t1": Path(tf.get(m["template"], desc=None, suffix="T1w", **get)),
+        "brain": Path(tf.get(m["template"], desc="brain", suffix="mask", **get)),
+    }
+
+
+def subject_t1(cfg: dict[str, Any], sub: str) -> dict[str, Path]:
+    """N4-corrected T1 and its brain mask (preproc.bias, preproc.brainmask)."""
+    d = resolve_path(cfg, "derivatives") / PIPELINE / sub / "anat"
+    return {
+        "t1_n4": d / f"{sub}_desc-n4_T1w.nii.gz",
+        "t1_brain": d / f"{sub}_space-T1w_desc-brain_mask.nii.gz",
+    }
 
 
 def registration_paths(cfg: dict[str, Any], sub: str) -> dict[str, Path]:
-    d = resolve_path(cfg, "derivatives") / PIPELINE / cfg["preproc"]["mni"]["output_dir"] / sub
-    stem = f"{sub}_from-T1w_to-{cfg['preproc']['atlas']['template']}_mode-image"
+    m = cfg["preproc"]["mni"]
+    d = resolve_path(cfg, "derivatives") / PIPELINE / sub / "anat"
+    stem = f"{sub}_from-T1w_to-{m['template']}_res-{m['resolution']}_mode-image"
     return {"affine": d / f"{stem}_desc-affine_xfm.mat", "warp": d / f"{stem}_desc-warp_xfm.nii.gz"}
 
 
@@ -65,23 +82,18 @@ def register_subject(sub: str, config_path: str | None = None) -> dict[str, Any]
     import ants
     import numpy as np
 
-    from wmh_multisite.preproc import atlas
     from wmh_multisite.preproc.register import remove_registration_files
 
     cfg = load_config(config_path)
     m = cfg["preproc"]["mni"]
-    tpl = atlas.template_files(template_cfg(cfg))
-    p = atlas.subject_paths(cfg, sub)
+    tpl = template_files(cfg)
+    p = subject_t1(cfg, sub)
     out = registration_paths(cfg, sub)
     missing = [k for k in ("t1_n4", "t1_brain") if not p[k].is_file()]
     if missing:
         raise FileNotFoundError(f"{sub}: missing {missing} (run brainmask and bias first)")
-    fixed = atlas.masked(
-        ants.image_read(str(tpl["t1"]), pixeltype="float"), ants.image_read(str(tpl["brain"]))
-    )
-    moving = atlas.masked(
-        ants.image_read(str(p["t1_n4"]), pixeltype="float"), ants.image_read(str(p["t1_brain"]))
-    )
+    fixed = ants.image_read(str(tpl["t1"]), pixeltype="float") * (ants.image_read(str(tpl["brain"])) > 0.5)
+    moving = ants.image_read(str(p["t1_n4"]), pixeltype="float") * (ants.image_read(str(p["t1_brain"])) > 0.5)
     ants.config._random_seed = m["seed"]
     t0 = time.time()
     reg = ants.registration(
@@ -111,10 +123,8 @@ def interleaved(part: pd.DataFrame) -> list[str]:
 
 
 def run(cfg: dict[str, Any], subjects: list[str], config_path: str | None = None) -> Path:
-    from wmh_multisite.preproc import atlas
-
     m = cfg["preproc"]["mni"]
-    atlas.template_files(template_cfg(cfg))  # download once, before the parallel workers
+    template_files(cfg)  # download once, before the parallel workers
     os.environ["ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"] = str(m["threads"])
     limit, floor = cfg["guard"]["ram_limit_gb"], cfg["guard"]["min_free_ram_gb"]
     todo = [s for s in subjects if not done(cfg, s)]

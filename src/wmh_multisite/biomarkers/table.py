@@ -6,7 +6,7 @@
                         + M1 on the 12 fold-0 validation subjects (held out from that model)
         |
         |  label 2 of O1 removed from every mask; HD-BET brain mask for the fraction;
-        |  ventricles = first available of ``biomarkers.ventricles`` (WMH-SynthSeg, then the atlas),
+        |  ventricles = first available of ``biomarkers.ventricles`` (WMH-SynthSeg),
         |  recorded in ``ventricle_source`` (NaN if the subject has none yet)
         v
     results/tables/biomarkers.csv   one row per (subject, source)
