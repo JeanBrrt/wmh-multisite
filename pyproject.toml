@@ -42,10 +42,11 @@ qc = ["torchio>=1.2"]
 # neuroHarmonize 2.5.x pins numpy<2, so the resolver falls back to 2.4.5, whose
 # metadata declares no dependencies: its runtime imports are listed explicitly.
 harmonize = ["neuroHarmonize>=2.4", "neuroCombat==0.2.12", "statsmodels>=0.14"]
-# Deep-learning segmentation and brain extraction: run on Kaggle GPU, not locally.
+# Deep-learning segmentation and brain extraction (training on Kaggle; local GPU steps install
+# their pinned versions in a temporary environment, see config.yaml).
 seg = ["nnunetv2>=2.6", "hd-bet>=2.0"]
-# End-to-end orchestration and carbon footprint.
-workflow = ["snakemake>=8.0", "codecarbon>=2.8"]
+# End-to-end orchestration.
+workflow = ["snakemake>=8.0"]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6", "ipykernel>=6.29", "nbstripout>=0.7"]
 # Everything that is meant to run on the local machine.
 local = ["wmh-multisite[qc,harmonize,workflow,dev]"]

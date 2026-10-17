@@ -1,0 +1,13 @@
+rater,biomarker,n,scale,bias,ratio_min,ratio_max,icc_a1,icc_ci_low,icc_ci_high
+resencm,wmh_ml,12,ratio,0.8716,0.68582,1.0545,0.99038,0.96757,0.99503
+O3,wmh_ml,12,ratio,0.92963,0.40536,1.5001,0.97629,0.9042,0.99787
+O4,wmh_ml,12,ratio,0.95211,0.64385,1.7681,0.97576,0.93889,0.98815
+resencm,wmh_periventricular_ml,12,ratio,0.90357,0.73129,1.0968,0.99152,0.97223,0.99566
+O3,wmh_periventricular_ml,12,ratio,0.95845,0.43734,1.4913,0.97686,0.91094,0.99779
+O4,wmh_periventricular_ml,12,ratio,0.97343,0.61804,2.0034,0.96866,0.91789,0.98811
+resencm,wmh_deep_ml,12,ratio,0.69863,0.30211,1.0197,0.97063,0.92487,0.99122
+O3,wmh_deep_ml,12,ratio,0.84125,0.2741,1.5578,0.97136,0.88304,0.99434
+O4,wmh_deep_ml,12,ratio,0.75772,0.18565,2.4687,0.94945,0.89327,0.98359
+resencm,n_lesions_ge10mm3,12,difference of ln(x + 1),-0.2265,-0.49899,0,0.93826,0.85404,0.97202
+O3,n_lesions_ge10mm3,12,difference of ln(x + 1),-0.1819,-0.62415,0.13353,0.93395,0.83617,0.97493
+O4,n_lesions_ge10mm3,12,difference of ln(x + 1),-0.13851,-0.28768,0.30538,0.96552,0.92333,0.98121

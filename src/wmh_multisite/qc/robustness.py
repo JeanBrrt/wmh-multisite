@@ -4,8 +4,8 @@
 which the segmentation itself degrades. An artifact the QC misses is harmless if the segmentation
 survives it, and a real risk if the segmentation breaks first.
 
-    10 test subjects of class "usable" (``qc.robustness.n_per_scanner`` per scanner; test subjects so
-    that the model has never seen them)
+    10 test subjects of class "usable" (``qc.artifacts.n_per_scanner`` per scanner; test subjects so
+    that the model has never seen them; the same subjects as ``qc.artifacts``)
       x artifact (noise, motion, bias, ghosting) x level 1..4 (``qc.artifacts.levels``; level 0 = the
         existing prediction on the unmodified image)
       -> the model input (FLAIR N4) degraded with TorchIO (``qc.artifacts.degrade``, fixed seed); the
@@ -39,22 +39,13 @@ from wmh_multisite.config import load_config, resolve_path
 from wmh_multisite.evaluate.interobserver import manual
 from wmh_multisite.evaluate.metrics import evaluate_case
 from wmh_multisite.preproc import PIPELINE
-from wmh_multisite.qc.artifacts import degrade
+from wmh_multisite.qc.artifacts import choose_subjects, degrade
 from wmh_multisite.seg.nnunet_infer import paths as nnunet_paths
 from wmh_multisite.seg.nnunet_infer import predict_cases
 from wmh_multisite.utils import io
 
 log = logging.getLogger(__name__)
 MODEL = "resencm"
-
-
-def choose_subjects(cfg: dict[str, Any], n_per_scanner: int) -> list[str]:
-    tables = resolve_path(cfg, "results") / "tables"
-    flags = pd.read_csv(tables / "qc_flags.csv")
-    part = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t").set_index("participant_id")
-    flags["split"] = flags.participant_id.map(part.split)
-    usable = flags[(flags.qc_class == "usable") & (flags.split == "test")].sort_values("participant_id")
-    return usable.groupby("scanner").head(n_per_scanner).participant_id.tolist()
 
 
 def build_cases(cfg: dict[str, Any], subjects: list[str]) -> tuple[list[dict[str, Any]], pd.DataFrame]:
@@ -154,7 +145,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
     cfg = load_config(args.config)
-    subjects = choose_subjects(cfg, cfg["qc"]["robustness"]["n_per_scanner"])
+    subjects = choose_subjects(cfg, cfg["qc"]["artifacts"]["n_per_scanner"])
     log.info("subjects: %s", subjects)
     cases, table = build_cases(cfg, subjects)
     predict_cases(cfg, MODEL, cases, "_nnunet_robustness_staging")

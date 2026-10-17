@@ -5,8 +5,9 @@ not voxel overlap but "is the volume right, and equally right on every scanner?"
 would create a site effect that has nothing to do with the patients.
 
     biomarkers.csv
-      test      : M1, M3 (then M2, DA5)  vs O1
-      training  : O3, O4 (60) and M1 on the 12 fold-0 validation subjects  vs O1   (human reference)
+      test      : M1, M2, M3 (``biomarkers.agreement_sources``)  vs O1
+      training  : O3, O4 (60)  vs O1   (human reference)
+      shared    : M1, O3, O4 on the 12 fold-0 validation subjects vs O1 (human ceiling, ``shared_cases``)
         |   per subject: d = ln(rater / O1)        (volumes span 0.8 to 195 ml: errors grow with the
         |                                           volume, Spearman 0.71 in ml, -0.31 on the log scale)
         v
@@ -18,7 +19,7 @@ would create a site effect that has nothing to do with the patients.
        (one test per rater and biomarker, Holm over all of them):
        does the bias depend on the site?
         v
-    results/tables/stats_agreement.csv, stats_agreement_by_scanner.csv,
+    results/tables/stats_agreement.csv, stats_agreement_by_scanner.csv, stats_agreement_shared.csv,
     results/figures/bland_altman_<split>_<rater>.png
 
 ICC(A,1) (McGraw and Wong 1996, two-way model, absolute agreement, single measure), from the two-way
@@ -163,8 +164,15 @@ def agreement(
         "icc_a1": icc_a1(pair),
         "icc_ci_low": float(np.quantile(boot, alpha)),
         "icc_ci_high": float(np.quantile(boot, 1 - alpha)),
-        "p_kruskal_site": float(stats.kruskal(*by_site).pvalue) if len(by_site) > 1 else float("nan"),
+        "p_kruskal_site": kruskal_p(by_site),
     }
+
+
+def kruskal_p(groups: list[np.ndarray]) -> float:
+    """Kruskal-Wallis p across the scanners; NaN with a single scanner or identical values everywhere."""
+    if len(groups) < 2 or np.ptp(np.concatenate(groups)) == 0:
+        return float("nan")
+    return float(stats.kruskal(*groups).pvalue)
 
 
 def by_scanner(
@@ -240,9 +248,14 @@ def run(cfg: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
     n_boot, level = e["bootstrap_samples"], e["confidence_level"]
     rng = np.random.default_rng(e["seed"])
     table = pd.read_csv(resolve_path(cfg, "results") / "tables" / "biomarkers.csv")
+    sources = cfg["biomarkers"].get("agreement_sources")
     overall, per_site = [], []
     for biomarker, kind in BIOMARKERS.items():
         for (split, rater), p in pairs(table, biomarker).items():
+            if sources and rater not in sources:
+                continue
+            if split == "training" and rater not in ("O3", "O4"):
+                continue  # M1 on its 12 validation subjects: compared with the experts in ``shared_cases``
             key = {"split": split, "rater": rater, "reference": "O1", "biomarker": biomarker}
             overall.append(key | agreement(p, kind, n_boot, level, rng))
             per_site += [key | r for r in by_scanner(p, kind, n_boot, level, rng)]
@@ -256,6 +269,47 @@ def run(cfg: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
     return overall, per_site
 
 
+def shared_cases(
+    table: pd.DataFrame, n_boot: int, level: float, rng: np.random.Generator, model: str = "resencm"
+) -> pd.DataFrame:
+    """Human ceiling of the biomarkers: M1 and the experts O3, O4 against O1 on the same subjects.
+
+    The only training subjects M1 never saw are its fold-0 validation subjects (those with an M1 row in
+    the training split). On so few subjects (12), the 2.5th-97.5th percentiles would just be the extremes:
+    the range of the ratios (min, max) is reported instead, with the bias and the ICC(A,1) and its
+    bootstrap CI. No site test (4 subjects per scanner)."""
+    training = table[table.split == "training"]
+    shared = set(training[training.source == model].participant_id)
+    rows = []
+    for biomarker, kind in BIOMARKERS.items():
+        available = pairs(training[training.participant_id.isin(shared)], biomarker)
+        for rater in (model, "O3", "O4"):
+            p = available.get(("training", rater))
+            if p is None:
+                continue
+            r = agreement(p, kind, n_boot, level, rng)
+            if "bias" not in r:
+                continue
+            q = p[(p.rater > 0) & (p.ref > 0)] if kind == "log" else p
+            d = (transform(q.rater, kind) - transform(q.ref, kind)).to_numpy()
+            back = np.exp if kind == "log" else (lambda v: v)
+            rows.append(
+                {
+                    "rater": rater,
+                    "biomarker": biomarker,
+                    "n": r["n"],
+                    "scale": r["scale"],
+                    "bias": r["bias"],
+                    "ratio_min": float(back(d.min())),
+                    "ratio_max": float(back(d.max())),
+                    "icc_a1": r["icc_a1"],
+                    "icc_ci_low": r["icc_ci_low"],
+                    "icc_ci_high": r["icc_ci_high"],
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Agreement of predicted vs manual biomarkers.")
     parser.add_argument("--config")
@@ -266,10 +320,21 @@ def main(argv: list[str] | None = None) -> None:
     tables = resolve_path(cfg, "results") / "tables"
     overall.to_csv(tables / "stats_agreement.csv", index=False, float_format="%.5g")
     per_site.to_csv(tables / "stats_agreement_by_scanner.csv", index=False, float_format="%.5g")
+    e = cfg["evaluation"]
+    shared = shared_cases(
+        pd.read_csv(tables / "biomarkers.csv"),
+        e["bootstrap_samples"],
+        e["confidence_level"],
+        np.random.default_rng(e["seed"]),
+    )
+    shared.to_csv(tables / "stats_agreement_shared.csv", index=False, float_format="%.5g")
     figures = resolve_path(cfg, "results") / "figures"
     figures.mkdir(parents=True, exist_ok=True)
     table = pd.read_csv(tables / "biomarkers.csv")
+    sources = cfg["biomarkers"].get("agreement_sources")
     for (split, rater), p in pairs(table, "wmh_ml").items():
+        if sources and rater not in sources:
+            continue
         bland_altman_figure(
             p,
             f"WMH volume: {rater} vs O1 ({split}, n={len(p)})",

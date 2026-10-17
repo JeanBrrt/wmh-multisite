@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from wmh_multisite.qc import robustness
+from wmh_multisite.qc import artifacts
 from wmh_multisite.seg import nnunet_infer
 
 
@@ -40,6 +40,6 @@ def test_robustness_uses_usable_test_subjects_per_scanner(tmp_path, monkeypatch)
             "split": ["test", "test", "test", "test", "test", "training"],
         }
     ).to_csv(tmp_path / "bids" / "participants.tsv", sep="\t", index=False)
-    monkeypatch.setattr(robustness, "resolve_path", lambda cfg, key: tmp_path / key)
-    chosen = robustness.choose_subjects({}, n_per_scanner=1)
+    monkeypatch.setattr(artifacts, "resolve_path", lambda cfg, key: tmp_path / key)
+    chosen = artifacts.choose_subjects({}, n_per_scanner=1)
     assert chosen == ["a1", "b1"]  # usable and test only (a2 flagged, t1 training)

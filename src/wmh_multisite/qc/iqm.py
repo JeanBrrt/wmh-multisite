@@ -22,6 +22,10 @@ the N4 field only, noise and contrast on the image after N4, so the bias is not 
     efc      sum(x / b log(x / b)) / (N / sqrt(N) log(1 / sqrt(N))), b = sqrt(sum x^2)   lower
     fber     median(x^2 in the head) / median(x^2 in the air)              higher
     inu_range |p95 - p5| of the N4 field in the brain                     lower
+    fwhm     in-plane smoothness (mm) of the RAW image in the brain, as AFNI 3dFWHMx (classic) used
+             by MRIQC: per axis, sqrt(-2 ln 2 / ln(1 - var(first differences) / (2 var))) x voxel
+             size (Forman 1995); motion blurs, so it rises                 lower
+             (in-plane only on the 3 mm 2D FLAIR grids, whose slice thickness would dominate)
 
 Deliberate differences from MRIQC:
 - Tissues come from WMH-SynthSeg, not from Atropos. White matter = labels 2/41 eroded like MRIQC
@@ -65,13 +69,22 @@ log = logging.getLogger(__name__)
 
 WM_LABELS, GM_LABELS, WMH_LABEL = (2, 41), (3, 42), 77
 DIETRICH_FACTOR = 0.6551364  # MRIQC: 1 / sqrt(2 / (4 - pi)); std of a Rayleigh variable / its sigma
-METRICS = ["snr_wm", "snrd_wm", "cnr", "cjv", "efc", "fber", "inu_range"]
+METRICS = ["snr_wm", "snrd_wm", "cnr", "cjv", "efc", "fber", "inu_range", "fwhm"]
 # Metrics judged per modality. The FLAIR has almost no WM/GM contrast (median ratio 0.87 to 0.99), so
 # CJV, which divides by |med_WM - med_GM|, blows up for reasons unrelated to quality (z up to 209). It
 # is measured for both but judged for the T1 only.
-JUDGED = {"FLAIR": ["snr_wm", "snrd_wm", "cnr", "efc", "fber", "inu_range"], "T1w": METRICS}
+JUDGED = {"FLAIR": ["snr_wm", "snrd_wm", "cnr", "efc", "fber", "inu_range", "fwhm"], "T1w": METRICS}
 # direction of "better": +1 higher is better, -1 lower is better, 0 no direction
-DIRECTION = {"snr_wm": 1, "snrd_wm": 1, "cnr": 1, "cjv": -1, "efc": -1, "fber": 1, "inu_range": -1}
+DIRECTION = {
+    "snr_wm": 1,
+    "snrd_wm": 1,
+    "cnr": 1,
+    "cjv": -1,
+    "efc": -1,
+    "fber": 1,
+    "inu_range": -1,
+    "fwhm": -1,
+}
 # MRIQC Harmonize erodes the white matter with this structure (scipy: 3D, connectivity 2)
 ERODE_STRUCTURE = ndimage.generate_binary_structure(3, 2)
 
@@ -156,6 +169,33 @@ def tissue_iqms(
     }
 
 
+def fwhm(image: np.ndarray, mask: np.ndarray, spacing: tuple[float, ...]) -> float:
+    """In-plane smoothness (mm) of ``image`` inside ``mask``: AFNI 3dFWHMx "classic" estimate.
+
+    For a Gaussian-smoothed noise field, the variance of the differences between neighbours along an
+    axis shrinks as the smoothing grows: FWHM = sqrt(-2 ln 2 / ln(1 - var(d) / (2 var))) x voxel size.
+    Averaged over the in-plane axes when one axis is much coarser (3 mm slices), else over all three.
+    """
+    x = image.astype(np.float64)
+    var = x[mask].var()
+    if var <= 0:
+        return float("nan")
+    axes = [0, 1, 2]
+    if max(spacing) > 1.5 * min(spacing):
+        axes.remove(int(np.argmax(spacing)))
+    values = []
+    for k in axes:
+        lead = [slice(None)] * 3
+        lead[k] = slice(1, None)
+        trail = [slice(None)] * 3
+        trail[k] = slice(None, -1)
+        both = mask[tuple(lead)] & mask[tuple(trail)]
+        ratio = np.diff(x, axis=k)[both].var() / (2 * var)
+        if 0 < ratio < 1:
+            values.append(np.sqrt(-2 * np.log(2) / np.log(1 - ratio)) * spacing[k])
+    return float(np.mean(values)) if values else float("nan")
+
+
 def inu_range(field: np.ndarray, brain: np.ndarray) -> float:
     lo, hi = np.percentile(field[brain], [5, 95])
     return float(abs(hi - lo))
@@ -229,6 +269,7 @@ def measure(
     wm, gm = tissues(labels, brain, spacing, wmh_margin_mm)
     out = tissue_iqms(correct(raw, field), wm, gm, background_mask(raw, head), head)
     out["inu_range"] = inu_range(field, brain)
+    out["fwhm"] = fwhm(raw, brain, spacing)  # on the raw image, as MRIQC
     return out
 
 

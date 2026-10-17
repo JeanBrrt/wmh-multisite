@@ -16,11 +16,13 @@ depend on which observer is the reference (here O3) and are reported for complet
 
 The M1 rows use nnU-Net's fold-0 validation predictions (``fold_0/validation``). Those 12 subjects were
 held out from the very model used on the test set (final checkpoint, not selected on them), so they are
-the only scans where M1 and the humans can be compared on the same images.
+the only scans where M1 and the humans can be compared on the same images. On them, M1 is tested
+against each expert (paired Wilcoxon on the symmetric metrics, Holm over these 6 tests).
 
 Outputs:
     results/tables/interobserver.csv           one row per (subject, rater, reference)
     results/tables/interobserver_summary.csv   means overall, by scanner, and on the 12 shared scans
+    results/tables/interobserver_paired.csv    M1 vs O3 and vs O4 on the 12 shared scans
 
 Usage:
     uv run python -m wmh_multisite.evaluate.interobserver
@@ -38,9 +40,11 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from wmh_multisite.config import load_config, resolve_path
 from wmh_multisite.evaluate.metrics import METRICS, evaluate_case
+from wmh_multisite.evaluate.stats import holm, mean_ci
 from wmh_multisite.seg.nnunet_infer import model_dir
 from wmh_multisite.utils import io
 
@@ -135,6 +139,45 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     ).T
 
 
+def paired_with_m1(
+    table: pd.DataFrame, n_boot: int = 2000, level: float = 0.95, seed: int = 42
+) -> pd.DataFrame:
+    """M1 against each expert on the scans they share, against O1, per symmetric metric.
+
+    Per-subject differences M1 - expert, with a bootstrap CI of their mean (resampled within each
+    scanner, as for the test-set comparisons), Wilcoxon signed-rank test, Holm over the 6 tests (2
+    experts x 3 metrics: one family, one question). ``n_m1_better`` counts the subjects where M1 is
+    closer to O1 (higher Dice or F1, lower HD95)."""
+    rng = np.random.default_rng(seed)
+    shared = table[table.shared_with_m1 & (table.reference == "O1")]
+    wide = shared.pivot_table(index=["participant_id", "scanner"], columns="rater", values=SYMMETRIC)
+    rows = []
+    for rater in ("O3", "O4"):
+        for metric in SYMMETRIC:
+            pair = wide[metric][["M1", rater]].dropna()
+            diff = pair["M1"] - pair[rater]
+            better = (diff < 0) if metric == "hd95_mm" else (diff > 0)
+            strata = pair.index.get_level_values("scanner").to_numpy()
+            mean, lo, hi = mean_ci(diff.to_numpy(), strata, n_boot, level, rng)
+            rows.append(
+                {
+                    "rater": rater,
+                    "metric": metric,
+                    "n": len(diff),
+                    "mean_m1": float(pair["M1"].mean()),
+                    "mean_rater": float(pair[rater].mean()),
+                    "mean_diff_m1_minus_rater": mean,
+                    "ci_low": lo,
+                    "ci_high": hi,
+                    "n_m1_better": int(better.sum()),
+                    "p_wilcoxon": float(stats.wilcoxon(diff).pvalue),
+                }
+            )
+    out = pd.DataFrame(rows)
+    out["p_holm"] = holm(out.p_wilcoxon.to_numpy())
+    return out
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="Inter-observer agreement (human ceiling) on the training set."
@@ -148,7 +191,11 @@ def main(argv: list[str] | None = None) -> None:
     out = resolve_path(cfg, "results") / "tables" / "interobserver.csv"
     table.round(4).to_csv(out, index=False)
     summary.round(4).to_csv(out.with_name("interobserver_summary.csv"))
+    e = cfg["evaluation"]
+    paired = paired_with_m1(table, e["bootstrap_samples"], e["confidence_level"], e["seed"])
+    paired.to_csv(out.with_name("interobserver_paired.csv"), index=False, float_format="%.4g")
     log.info("%s\n%s", out, summary.round(3).to_string())
+    log.info("M1 vs experts on the shared scans:\n%s", paired.to_string(index=False, float_format="%.3g"))
 
 
 if __name__ == "__main__":

@@ -5,7 +5,8 @@ The organizers picked the challenge images, so few if any are really bad. To tes
 IQMs are recomputed and judged by the detector fitted on the real images. One modality at a time
 (``--modality``): the FLAIR, and the T1, where CJV (MRIQC's motion-sensitive metric) is judged.
 
-    clean raw images of one modality (``n_per_scanner`` usable subjects per scanner)
+    clean raw images of one modality (``n_per_scanner`` usable TEST subjects per scanner: the same
+    subjects as ``qc.robustness``, so that detection and segmentation are read on the same images)
       x artifact (noise, motion, bias field, ghosting) x level (0 = none ... 4 = strong, ``qc.artifacts``)
           image / brain median -> TorchIO transform (fixed seed) -> x brain median
       -> N4 on the degraded image (same settings as the pipeline), as a real image would get
@@ -39,10 +40,20 @@ import pandas as pd
 
 from wmh_multisite.config import load_config, resolve_path
 from wmh_multisite.qc.iqm import DIRECTION, JUDGED, labels_to_t1, measure, subject_paths
-from wmh_multisite.qc.outliers import badness_z
+from wmh_multisite.qc.outliers import badness_z, forest_features
 from wmh_multisite.utils import io
 
 log = logging.getLogger(__name__)
+
+
+def choose_subjects(cfg: dict[str, Any], n_per_scanner: int) -> list[str]:
+    """The first ``n_per_scanner`` usable test subjects of each scanner (shared with ``qc.robustness``)."""
+    tables = resolve_path(cfg, "results") / "tables"
+    flags = pd.read_csv(tables / "qc_flags.csv")
+    part = pd.read_csv(resolve_path(cfg, "bids") / "participants.tsv", sep="\t").set_index("participant_id")
+    flags["split"] = flags.participant_id.map(part.split)
+    usable = flags[(flags.qc_class == "usable") & (flags.split == "test")].sort_values("participant_id")
+    return usable.groupby("scanner").head(n_per_scanner).participant_id.tolist()
 
 
 def degrade(
@@ -132,9 +143,8 @@ def run(cfg: dict[str, Any], modality: str = "FLAIR") -> pd.DataFrame:
         )
         return pd.DataFrame()
     forest = IsolationForest(n_estimators=500, contamination=q["iforest_contamination"], random_state=seed)
-    forest.fit(z_clean.fillna(0.0))
-    usable = flags[flags.qc_class == "usable"]
-    chosen = usable.groupby("scanner").head(a["n_per_scanner"]).index.tolist()
+    forest.fit(forest_features(z_clean))
+    chosen = choose_subjects(cfg, a["n_per_scanner"])
     log.info("degrading the %s of %d usable subjects: %s", modality, len(chosen), chosen)
     if not chosen:
         log.warning("no usable subject on an assessed scanner yet: nothing to degrade")
@@ -165,7 +175,7 @@ def run(cfg: dict[str, Any], modality: str = "FLAIR") -> pd.DataFrame:
     other = z_clean.loc[  # the other modality keeps the z of its real image
         table.participant_id, [c for c in z_clean.columns if not c.startswith(f"{modality}_")]
     ].reset_index(drop=True)
-    features = pd.concat([z.reset_index(drop=True), other], axis=1)[z_clean.columns].fillna(0.0)
+    features = forest_features(pd.concat([z.reset_index(drop=True), other], axis=1)[z_clean.columns])
     table["max_z"] = z.max(axis=1).to_numpy()
     table["worst_metric"] = z.idxmax(axis=1).to_numpy()
     table["iforest_outlier"] = forest.predict(features) == -1

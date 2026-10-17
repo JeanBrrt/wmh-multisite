@@ -163,7 +163,8 @@ def iqm_table(n_per_scanner=12, seed=0):
             for modality in ("FLAIR", "T1w"):
                 row = {"participant_id": f"{scanner}{i}", "scanner": scanner, "modality": modality}
                 row |= {
-                    m: rng.normal(1.0, 0.05) for m in ["snrd_wm", "cnr", "cjv", "efc", "fber", "inu_range"]
+                    m: rng.normal(1.0, 0.05)
+                    for m in ["snrd_wm", "cnr", "cjv", "efc", "fber", "inu_range", "fwhm"]
                 }
                 row["snr_wm"] = snr + rng.normal(0, 1)
                 rows.append(row)
@@ -258,3 +259,23 @@ def test_artifact_badness_uses_the_metrics_judged_for_each_modality():
     z = badness(rows, t, "T1w")
     assert "T1w_cjv" in z.columns and z["T1w_cjv"].iloc[0] > 5
     assert "FLAIR_cjv" not in badness(t[t.modality == "FLAIR"], t, "FLAIR").columns
+
+
+def test_fwhm_of_smoothed_noise():
+    from scipy import ndimage
+
+    from wmh_multisite.qc.iqm import fwhm
+
+    rng = np.random.default_rng(0)
+    noise = rng.normal(size=(80, 80, 80))
+    mask = np.zeros(noise.shape, bool)
+    mask[10:70, 10:70, 10:70] = True
+    sigma = 2.0  # voxels: FWHM = 2.355 sigma
+    smooth = ndimage.gaussian_filter(noise, sigma)
+    assert fwhm(smooth, mask, (1.0, 1.0, 1.0)) == pytest.approx(2.355 * sigma, rel=0.1)
+    assert fwhm(smooth, mask, (0.5, 0.5, 0.5)) == pytest.approx(2.355 * sigma * 0.5, rel=0.1)  # in mm
+    blurrier = ndimage.gaussian_filter(noise, 3.0)
+    assert fwhm(blurrier, mask, (1.0, 1.0, 1.0)) > fwhm(smooth, mask, (1.0, 1.0, 1.0))
+    # 3 mm slices: only the in-plane axes are used
+    aniso = fwhm(smooth, mask, (1.0, 1.0, 3.0))
+    assert aniso == pytest.approx(2.355 * sigma, rel=0.1)

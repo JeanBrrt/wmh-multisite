@@ -82,10 +82,10 @@ rule nnunet_export:  # Dataset001_WMH for Kaggle
     output: f"{NNUNET}/nnUNet_raw/{NN['dataset_name']}/dataset.json"
     shell: f"{PY}.seg.nnunet"
 
-rule kaggle_nnunet_training:  # EXTERNAL: kaggle/03_nnunet_train.ipynb (resencm), 04_nnunet_train_da5.ipynb (DA5)
+rule kaggle_nnunet_training:  # EXTERNAL: kaggle/nnunet_training.ipynb, one run per trainer (resencm, DA5)
     input: ancient(f"{NNUNET}/nnUNet_raw/{NN['dataset_name']}/dataset.json")
     output: MODEL_DIR + "/fold_0/checkpoint_final.pth"
-    shell: "echo 'External step: train {wildcards.trainer} on Kaggle (kaggle/03 or 04 notebook) and copy nnUNet_results/ to " + NNUNET + "/' && exit 1"
+    shell: "echo 'External step: train {wildcards.trainer} on Kaggle (kaggle/nnunet_training.ipynb, TRAINER = {wildcards.trainer}) and copy nnUNet_results/ to " + NNUNET + "/' && exit 1"
 
 rule nnunet_infer:  # local GPU inference; model "<key>pre": on the organizers' pre/ images
     input: lambda w: ancient((MODEL_DIR + "/fold_0/checkpoint_final.pth").format(trainer=TRAINERS[w.model.removesuffix("pre")]))
@@ -94,10 +94,10 @@ rule nnunet_infer:  # local GPU inference; model "<key>pre": on the organizers' 
     wildcard_constraints: model="resencm|resencm_da5|resencmpre"
     shell: f"{PY}.seg.nnunet_infer --split test --model {{params.model}} --inputs {{params.inputs}}"
 
-rule kaggle_wmhsynthseg:  # EXTERNAL: kaggle/05_wmhsynthseg.ipynb, parts 1-3, archives unzipped at the root
+rule kaggle_wmhsynthseg:  # EXTERNAL: kaggle/wmhsynthseg.ipynb, parts 1-3, archives unzipped at the root
     input: ancient(f"{BIDS}/participants.tsv")
     output: f"{DER}/sub-000/anat/sub-000_desc-wmhsynthseg1mm_dseg.nii.gz"
-    shell: "echo 'External step: run kaggle/05_wmhsynthseg.ipynb (PART 1, 2, 3) and unzip the archives at the repository root' && exit 1"
+    shell: "echo 'External step: run kaggle/wmhsynthseg.ipynb (PART 1, 2, 3) and unzip the archives at the repository root' && exit 1"
 
 rule threshold:  # M3: grid search on the training set, then application; other normalisations
     input: ancient(f"{DER}/n4_report.csv"), ancient(f"{DER}/sub-000/anat/sub-000_desc-wmhsynthseg1mm_dseg.nii.gz")
@@ -123,16 +123,16 @@ rule evaluate:  # official challenge metrics
 
 rule stats:  # bootstrap CIs, paired tests, seen vs unseen
     input: expand(f"{TABLES}/evaluation_{{m}}.csv", m=EVALUATED)
-    output: f"{TABLES}/stats_ci.csv", f"{TABLES}/stats_paired.csv", f"{TABLES}/stats_seen_unseen.csv"
+    output: f"{TABLES}/stats_ci.csv", f"{TABLES}/stats_paired.csv", f"{TABLES}/stats_seen_unseen.csv", f"{TABLES}/stats_gain_unseen.csv", f"{TABLES}/stats_scanner_effect.csv"
     shell: f"{PY}.evaluate.stats"
 
 rule interobserver:  # human ceiling
     input: ancient(MODEL_DIR.format(trainer=TRAINERS["resencm"]) + "/fold_0/checkpoint_final.pth")
-    output: f"{TABLES}/interobserver_summary.csv"
+    output: f"{TABLES}/interobserver_summary.csv", f"{TABLES}/interobserver_paired.csv"
     shell: f"{PY}.evaluate.interobserver"
 
 rule figures:  # summary figures, leaderboard position
-    input: f"{TABLES}/stats_ci.csv", f"{TABLES}/interobserver_summary.csv"
+    input: f"{TABLES}/stats_ci.csv"
     output: f"{TABLES}/leaderboard_positions.csv", f"{FIGURES}/dice_by_method_and_scanner.png"
     shell: f"{PY}.viz.figures"
 
@@ -146,7 +146,7 @@ rule biomarkers:  # volumes + ICV, periventricular / deep, lesions
 
 rule agreement:  # Bland-Altman, ICC, bias per site
     input: f"{TABLES}/biomarkers.csv"
-    output: f"{TABLES}/stats_agreement.csv", f"{TABLES}/stats_agreement_by_scanner.csv"
+    output: f"{TABLES}/stats_agreement.csv", f"{TABLES}/stats_agreement_by_scanner.csv", f"{TABLES}/stats_agreement_shared.csv"
     shell: f"{PY}.biomarkers.agreement"
 
 rule syn_mni:  # SyN CC on the 2 mm MNI template, all subjects (~8 h with 12 threads)

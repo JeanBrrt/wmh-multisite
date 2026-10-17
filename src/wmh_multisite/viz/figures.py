@@ -4,7 +4,6 @@
       dice_by_method_and_scanner.png   mean Dice and bootstrap 95 % CI per method and scanner
       seen_vs_unseen.png               Dice and HD95, scanners seen vs unseen in training, with CIs
       leaderboard.png                  official overall rank score of the 57 published teams + ours
-      human_ceiling.png                inter-observer agreement next to the methods
     results/tables/leaderboard_positions.csv
 
 Only aggregated numbers are drawn (no patient image).
@@ -33,13 +32,12 @@ from wmh_multisite.evaluate.leaderboard import HIGHER_IS_BETTER, position, ranki
 
 log = logging.getLogger(__name__)
 
-METHODS = {  # key -> label (main comparison; variants are in the tables)
+METHODS = {  # key -> label (the study, ``evaluation.families.central``; side experiments are in the tables)
     "resencm": "M1 nnU-Net",
-    "resencm_da5": "M1 + DA5",
     "threshold": "M3 threshold",
     "wmhsynthseg": "M2 WMH-SynthSeg",
 }
-COLORS = {"resencm": "#1f77b4", "resencm_da5": "#7fb3e0", "threshold": "#ff7f0e", "wmhsynthseg": "#2ca02c"}
+COLORS = {"resencm": "#1f77b4", "threshold": "#ff7f0e", "wmhsynthseg": "#2ca02c"}
 
 
 def _ci(ci: pd.DataFrame, model: str, group: str, metric: str) -> tuple[float, float, float]:
@@ -128,29 +126,6 @@ def leaderboard_figure(leaderboard: pd.DataFrame, ours: dict[str, dict[str, Any]
     plt.close(fig)
 
 
-def human_ceiling(inter: pd.DataFrame, ci: pd.DataFrame, path: Path) -> None:
-    rows = [
-        ("O3 vs O1 (60 train)", inter.loc["O3 vs O1 | all", "dice"], "#8c564b"),
-        ("O4 vs O1 (60 train)", inter.loc["O4 vs O1 | all", "dice"], "#8c564b"),
-        ("O4 vs O3 (60 train)", inter.loc["O4 vs O3 | all", "dice"], "#c49c94"),
-        ("O3 vs O1 (12 shared)", inter.loc["O3 vs O1 | 12 scans shared with M1", "dice"], "#8c564b"),
-        ("O4 vs O1 (12 shared)", inter.loc["O4 vs O1 | 12 scans shared with M1", "dice"], "#8c564b"),
-        ("M1 vs O1 (12 shared)", inter.loc["M1 vs O1 | 12 scans shared with M1", "dice"], COLORS["resencm"]),
-        ("M1 vs O1 (110 test)", _ci(ci, "resencm", "all", "dice")[0], COLORS["resencm"]),
-    ]
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.barh([r[0] for r in rows], [r[1] for r in rows], color=[r[2] for r in rows])
-    for i, r in enumerate(rows):
-        ax.text(r[1] + 0.005, i, f"{r[1]:.3f}", va="center", fontsize=8)
-    ax.set_xlim(0.6, 0.9)
-    ax.invert_yaxis()
-    ax.set_xlabel("Dice against the reference O1")
-    ax.set_title("Human ceiling: inter-observer agreement vs nnU-Net (M1)", fontsize=10)
-    fig.tight_layout()
-    fig.savefig(path, dpi=130)
-    plt.close(fig)
-
-
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Summary figures.")
     parser.add_argument("--config")
@@ -162,21 +137,20 @@ def main(argv: list[str] | None = None) -> None:
     figures.mkdir(parents=True, exist_ok=True)
     ci = pd.read_csv(tables / "stats_ci.csv")
     leaderboard = pd.read_csv(tables / "leaderboard_wmh2017.csv")
-    ours = {}
-    for model in METHODS:
-        f = tables / f"evaluation_{model}.csv"
-        if f.is_file():
-            e = pd.read_csv(f)
-            ours[model] = position(leaderboard, {m: float(e[m].mean()) for m in HIGHER_IS_BETTER}, model)
-    pd.DataFrame(ours).T.rename_axis("model").to_csv(
+    positions = {}  # every evaluated method, side experiments included (table); the study only (figure)
+    for f in sorted(tables.glob("evaluation_*.csv")):
+        if f.stem.endswith("_summary"):
+            continue
+        model = f.stem.removeprefix("evaluation_")
+        e = pd.read_csv(f)
+        positions[model] = position(leaderboard, {m: float(e[m].mean()) for m in HIGHER_IS_BETTER}, model)
+    pd.DataFrame(positions).T.rename_axis("model").to_csv(
         tables / "leaderboard_positions.csv", float_format="%.4g"
     )
+    ours = {m: positions[m] for m in METHODS if m in positions}
     dice_by_method_and_scanner(ci, figures / "dice_by_method_and_scanner.png")
     seen_vs_unseen(ci, figures / "seen_vs_unseen.png")
     leaderboard_figure(leaderboard, ours, figures / "leaderboard.png")
-    human_ceiling(
-        pd.read_csv(tables / "interobserver_summary.csv", index_col=0), ci, figures / "human_ceiling.png"
-    )
     log.info("leaderboard positions: %s", {m: f"{p['position']}/{p['n_teams']}" for m, p in ours.items()})
 
 

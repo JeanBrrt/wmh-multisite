@@ -8,8 +8,10 @@ from wmh_multisite.evaluate.metrics import METRICS
 from wmh_multisite.evaluate.stats import (
     bootstrap_means,
     ci_table,
+    gain_unseen_table,
     holm,
     paired_table,
+    scanner_effect_table,
     seen_unseen_table,
 )
 
@@ -85,3 +87,47 @@ def test_seen_unseen_difference():
     assert row.n_seen == 20 and row.n_unseen == 10
     assert row.diff_unseen_minus_seen == pytest.approx(-0.2, abs=0.03)
     assert row.ci_low < -0.15 and row.ci_high < 0 and row.p_mannwhitney < 1e-3
+
+
+def test_holm_is_applied_within_each_family():
+    # C copies A: the pair (A, B) alone in family "f1", the pairs of A, B and C together in "f2"
+    t = fake_table()
+    t = pd.concat([t, t[t.model == "A"].assign(model="C")], ignore_index=True)
+    p = paired_table(t, 100, 0.95, seed=1, families={"f1": ["A", "B"], "f2": ["A", "B", "C"]})
+    assert set(p.family) == {"f1", "f2"}
+    assert len(p[p.family == "f1"]) == len(METRICS) and len(p[p.family == "f2"]) == 3 * len(METRICS)
+    f1, f2 = (
+        p[(p.family == f) & (p.model_a == "A") & (p.model_b == "B")].set_index("metric") for f in ("f1", "f2")
+    )
+    assert f1.loc["dice", "p_wilcoxon"] == pytest.approx(f2.loc["dice", "p_wilcoxon"])
+    assert f1.loc["dice", "p_holm"] < f2.loc["dice", "p_holm"]  # a smaller family, a milder correction
+    s = seen_unseen_table(t, 100, 0.95, seed=1, families={"f1": ["A", "B"], "f2": ["C"]})
+    assert s.groupby("family").size().to_dict() == {"f1": 2 * len(METRICS), "f2": len(METRICS)}
+
+
+def test_gain_on_unseen_scanners():
+    # C = A, except +0.1 Dice on the unseen scanner u only: the gain C - A is larger on unseen scanners
+    t = fake_table()
+    c = t[t.model == "A"].assign(model="C")
+    c.loc[~c.seen_in_training, "dice"] += 0.1
+    t = pd.concat([t, c], ignore_index=True)
+    g = gain_unseen_table(t, [["C", "A"], ["C", "missing"]], 200, 0.95, seed=1).set_index("metric")
+    assert len(g) == len(METRICS)  # the pair with a missing model is skipped
+    row = g.loc["dice"]
+    assert row.n_seen == 20 and row.n_unseen == 10
+    assert row.gain_seen == pytest.approx(0) and row.gain_unseen == pytest.approx(0.1)
+    assert row.ci_low == pytest.approx(0.1) and row.p_mannwhitney < 1e-3
+    assert (g.p_holm >= g.p_mannwhitney).all()
+
+
+def test_scanner_effect():
+    # scanner u is 0.2 lower on the Dice: a strong scanner effect on the Dice of both models
+    s = scanner_effect_table(fake_table()).set_index(["model", "metric"])
+    assert s.loc[("A", "dice"), "n_scanners"] == 3
+    assert s.loc[("A", "dice"), "p_kruskal"] < 1e-4 and s.loc[("B", "dice"), "p_kruskal"] < 1e-4
+
+
+def test_scanner_effect_is_corrected_within_each_family():
+    t = fake_table()
+    s = scanner_effect_table(t, families={"f": ["A", "B"]})
+    assert (s.family == "f").all() and (s.p_holm >= s.p_kruskal).all()

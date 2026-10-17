@@ -11,6 +11,7 @@ from wmh_multisite.biomarkers.agreement import (
     by_scanner,
     icc_a1,
     pairs,
+    shared_cases,
     stratified_indices,
 )
 
@@ -115,3 +116,38 @@ def test_kruskal_wallis_p_values_are_holm_corrected(tmp_path, monkeypatch):
     expected = holm(raw.loc[tested, "p_kruskal_site"].to_numpy())
     assert expected.tolist() == pytest.approx([0.03, 0.08, 0.5])  # 3 tests: x3, x2, x1, monotone
     assert hasattr(ag, "holm")
+
+
+def test_shared_cases_compare_m1_and_experts_on_the_same_subjects():
+    # 6 training subjects, M1 on 4 of them: only those 4 are compared, for M1, O3 and O4.
+    # O3 measures 1.1 x O1 on average, with a per-subject spread that gives a known min and max.
+    spread = [0.95, 1.0, 1.05, 1.0, 1.0, 1.0]
+    rows = []
+    for i in range(6):
+        for src, factor in [
+            ("O1", 1.0),
+            ("O3", 1.1 * spread[i]),
+            ("O4", 0.9 / spread[i]),
+            ("resencm", spread[3 - i % 4]),
+        ]:
+            if src == "resencm" and i >= 4:
+                continue
+            rows.append(
+                {
+                    "participant_id": f"s{i}",
+                    "scanner": "ab"[i % 2],
+                    "split": "training",
+                    "source": src,
+                    "wmh_ml": factor * (2.0 + i),
+                    "wmh_periventricular_ml": factor * (1.0 + i),
+                    "wmh_deep_ml": factor * (1.0 + i),
+                    "n_lesions_ge10mm3": 10 + i + (src != "O1") * (i % 2),
+                }
+            )
+    out = shared_cases(pd.DataFrame(rows), 50, 0.95, np.random.default_rng(0))
+    vol = out[out.biomarker == "wmh_ml"].set_index("rater")
+    assert set(vol.index) == {"resencm", "O3", "O4"} and (vol.n == 4).all()
+    assert vol.loc["O3", "ratio_min"] == pytest.approx(1.1 * 0.95) and vol.loc[
+        "O3", "ratio_max"
+    ] == pytest.approx(1.1 * 1.05)
+    assert vol.loc["O3", "bias"] == pytest.approx(1.1, rel=0.01)

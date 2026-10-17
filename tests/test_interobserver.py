@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from wmh_multisite.evaluate.interobserver import compare, summarize, with_ignore
+from wmh_multisite.evaluate.interobserver import compare, paired_with_m1, summarize, with_ignore
 
 SHAPE = (10, 10, 4)
 
@@ -61,3 +61,35 @@ def test_summary_groups_pairs_scanners_and_shared_scans():
     assert s.loc["O3 vs O1 | all", "n"] == 3 and s.loc["O4 vs O1 | all", "dice"] == pytest.approx(0.8)
     assert s.loc["O3 vs O1 | scanner=x", "n"] == 2
     assert s.loc["O3 vs O1 | 12 scans shared with M1", "n"] == 1
+
+
+def test_m1_against_each_expert_on_the_shared_scans():
+    # 12 shared scans: M1 beats O3 everywhere (Dice +0.1, HD95 -1 mm), and is level with O4 (noise)
+    rng = np.random.default_rng(0)
+    rows = []
+    for i in range(12):
+        base = {"dice": 0.7 + 0.01 * i, "hd95_mm": 5.0 + 0.1 * i, "lesion_f1": 0.7}
+        for rater, shift in [("M1", 0.1), ("O3", 0.0), ("O4", None)]:
+            noise = rng.normal(0, 0.01) if shift is None else 0.0
+            d = (shift or 0.0) + noise
+            rows.append(
+                {
+                    "participant_id": f"s{i}",
+                    "scanner": "ab"[i % 2],
+                    "rater": rater,
+                    "reference": "O1",
+                    "shared_with_m1": True,
+                    "dice": base["dice"] + d,
+                    "hd95_mm": base["hd95_mm"] - 10 * d,
+                    "lesion_f1": base["lesion_f1"] + d,
+                }
+            )
+    p = paired_with_m1(pd.DataFrame(rows)).set_index(["rater", "metric"])
+    assert len(p) == 6 and (p.n == 12).all()
+    assert p.loc[("O3", "dice"), "n_m1_better"] == 12 and p.loc[("O3", "hd95_mm"), "n_m1_better"] == 12
+    assert p.loc[("O3", "dice"), "p_wilcoxon"] < 0.001
+    assert (p.p_holm >= p.p_wilcoxon).all()
+    # M1 - O3 is exactly +0.1 on every scan: the bootstrap interval collapses on it
+    assert p.loc[("O3", "dice"), "ci_low"] == pytest.approx(0.1) and p.loc[
+        ("O3", "dice"), "ci_high"
+    ] == pytest.approx(0.1)

@@ -34,10 +34,10 @@ COPY src ./src
 COPY config ./config
 COPY workflow ./workflow
 COPY scripts ./scripts
-COPY hpc ./hpc
+COPY containers/wmh_multisite_trainers.py ./containers/
 RUN uv sync --frozen --no-dev $UV_EXTRAS \
  && if python -c "import nnunetv2" 2>/dev/null; then \
-        cp hpc/wmh_multisite_trainers.py \
+        cp containers/wmh_multisite_trainers.py \
            "$(python -c 'import nnunetv2, os; print(os.path.dirname(nnunetv2.__file__))')/training/nnUNetTrainer/variants/"; \
     fi
 

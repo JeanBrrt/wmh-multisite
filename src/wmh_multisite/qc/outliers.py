@@ -7,7 +7,9 @@ a whole site would be flagged. Each image is judged against the images of its ow
       1. robust z per scanner and modality: z = (x - median_scanner) / (1.4826 MAD_scanner), signed so that
          a positive z means "worse" (``iqm.DIRECTION``; metrics without a direction use |z|)
       2. Isolation Forest on these z (FLAIR and T1 together): isolates each subject by random cuts; an
-         atypical subject is isolated in few cuts, including unusual *combinations* that no single IQM shows
+         atypical subject is isolated in few cuts, including unusual *combinations* that no single IQM shows.
+         The z are clipped at 0 first: like the thresholds, the forest only sees the "worse" side, else it
+         flagged images that were unusually *good* (a very high FBER)
       3. classes ("not_assessed" if the scanner has fewer than ``min_per_scanner`` images):
          exclude if max z >= ``z_exclude``; check if max z >= ``z_check`` or Isolation Forest
          outlier; usable otherwise. A prompt for visual review, never an automatic exclusion.
@@ -62,6 +64,11 @@ def badness_z(iqm: pd.DataFrame, min_group: int = 1) -> pd.DataFrame:
     return pd.DataFrame(cols)
 
 
+def forest_features(z: pd.DataFrame) -> pd.DataFrame:
+    """Isolation Forest input: z clipped at 0 (only the "worse" side counts), missing values as 0."""
+    return z.clip(lower=0).fillna(0.0)
+
+
 def classify(z: pd.DataFrame, cfg_qc: dict[str, Any], seed: int) -> pd.DataFrame:
     forest = IsolationForest(
         n_estimators=500, contamination=cfg_qc["iforest_contamination"], random_state=seed
@@ -73,7 +80,7 @@ def classify(z: pd.DataFrame, cfg_qc: dict[str, Any], seed: int) -> pd.DataFrame
     out["iforest_outlier"] = False
     out["iforest_score"] = np.nan
     if assessed.sum() >= 2:
-        filled = z.loc[assessed].fillna(0.0)
+        filled = forest_features(z.loc[assessed])
         out.loc[assessed, "iforest_outlier"] = forest.fit_predict(filled) == -1
         out.loc[assessed, "iforest_score"] = -forest.score_samples(filled)  # higher = more atypical
     out["qc_class"] = np.select(
